@@ -4,7 +4,7 @@
  * Licensed under the MIT license
  */
 
-module.exports = (function(root) {
+module.exports = (function (root) {
   'use strict';
 
   // private shared variables/methods
@@ -159,7 +159,10 @@ module.exports = (function(root) {
         return null;
     }
 
-    return { x: x, y: y };
+    return {
+      x: x,
+      y: y
+    };
   }
 
   // public methods
@@ -173,7 +176,7 @@ module.exports = (function(root) {
     // Bezier algos from http://algorithmist.net/docs/subdivision.pdf
     QuadraticBezier: {
       // Roger Willcocks bezier flatness criterion
-      isFlat: function(p1, p2, c1, tol) {
+      isFlat: function (p1, p2, c1, tol) {
         tol = 4 * tol * tol;
 
         var ux = 2 * c1.x - p1.x - p2.x;
@@ -186,9 +189,13 @@ module.exports = (function(root) {
       },
 
       // turn Bezier into line segments via de Casteljau, returns an array of points
-      linearize: function(p1, p2, c1, tol) {
+      linearize: function (p1, p2, c1, tol) {
         var finished = [p1]; // list of points to return
-        var todo = [{ p1: p1, p2: p2, c1: c1 }]; // list of Beziers to divide
+        var todo = [{
+          p1: p1,
+          p2: p2,
+          c1: c1
+        }]; // list of Beziers to divide
 
         // recursion could stack overflow, loop instead
         while (todo.length > 0) {
@@ -196,7 +203,10 @@ module.exports = (function(root) {
 
           if (this.isFlat(segment.p1, segment.p2, segment.c1, tol)) {
             // reached subdivision limit
-            finished.push({ x: segment.p2.x, y: segment.p2.y });
+            finished.push({
+              x: segment.p2.x,
+              y: segment.p2.y
+            });
             todo.shift();
           } else {
             var divided = this.subdivide(segment.p1, segment.p2, segment.c1, 0.5);
@@ -208,7 +218,7 @@ module.exports = (function(root) {
 
       // subdivide a single Bezier
       // t is the percent along the Bezier to divide at. eg. 0.5
-      subdivide: function(p1, p2, c1, t) {
+      subdivide: function (p1, p2, c1, t) {
         var mid1 = {
           x: p1.x + (c1.x - p1.x) * t,
           y: p1.y + (c1.y - p1.y) * t
@@ -224,15 +234,23 @@ module.exports = (function(root) {
           y: mid1.y + (mid2.y - mid1.y) * t
         };
 
-        var seg1 = { p1: p1, p2: mid3, c1: mid1 };
-        var seg2 = { p1: mid3, p2: p2, c1: mid2 };
+        var seg1 = {
+          p1: p1,
+          p2: mid3,
+          c1: mid1
+        };
+        var seg2 = {
+          p1: mid3,
+          p2: p2,
+          c1: mid2
+        };
 
         return [seg1, seg2];
       }
     },
 
     CubicBezier: {
-      isFlat: function(p1, p2, c1, c2, tol) {
+      isFlat: function (p1, p2, c1, c2, tol) {
         tol = 16 * tol * tol;
 
         var ux = 3 * c1.x - 2 * p1.x - p2.x;
@@ -257,9 +275,14 @@ module.exports = (function(root) {
         return ux + uy <= tol;
       },
 
-      linearize: function(p1, p2, c1, c2, tol) {
+      linearize: function (p1, p2, c1, c2, tol) {
         var finished = [p1]; // list of points to return
-        var todo = [{ p1: p1, p2: p2, c1: c1, c2: c2 }]; // list of Beziers to divide
+        var todo = [{
+          p1: p1,
+          p2: p2,
+          c1: c1,
+          c2: c2
+        }]; // list of Beziers to divide
 
         // recursion could stack overflow, loop instead
 
@@ -268,7 +291,10 @@ module.exports = (function(root) {
 
           if (this.isFlat(segment.p1, segment.p2, segment.c1, segment.c2, tol)) {
             // reached subdivision limit
-            finished.push({ x: segment.p2.x, y: segment.p2.y });
+            finished.push({
+              x: segment.p2.x,
+              y: segment.p2.y
+            });
             todo.shift();
           } else {
             var divided = this.subdivide(segment.p1, segment.p2, segment.c1, segment.c2, 0.5);
@@ -278,7 +304,7 @@ module.exports = (function(root) {
         return finished;
       },
 
-      subdivide: function(p1, p2, c1, c2, t) {
+      subdivide: function (p1, p2, c1, c2, t) {
         var mid1 = {
           x: p1.x + (c1.x - p1.x) * t,
           y: p1.y + (c1.y - p1.y) * t
@@ -309,15 +335,25 @@ module.exports = (function(root) {
           y: mida.y + (midb.y - mida.y) * t
         };
 
-        var seg1 = { p1: p1, p2: midx, c1: mid1, c2: mida };
-        var seg2 = { p1: midx, p2: p2, c1: midb, c2: mid2 };
+        var seg1 = {
+          p1: p1,
+          p2: midx,
+          c1: mid1,
+          c2: mida
+        };
+        var seg2 = {
+          p1: midx,
+          p2: p2,
+          c1: midb,
+          c2: mid2
+        };
 
         return [seg1, seg2];
       }
     },
 
     Arc: {
-      linearize: function(p1, p2, rx, ry, angle, largearc, sweep, tol) {
+      linearize: function (p1, p2, rx, ry, angle, largearc, sweep, tol) {
         var finished = [p2]; // list of points to return
 
         var arc = this.svgToCenter(p1, p2, rx, ry, angle, largearc, sweep);
@@ -380,7 +416,7 @@ module.exports = (function(root) {
 
       // convert from center point/angle sweep definition to SVG point and flag definition of arcs
       // ported from http://commons.oreilly.com/wiki/index.php/SVG_Essentials/Paths
-      centerToSvg: function(center, rx, ry, theta1, extent, angleDegrees) {
+      centerToSvg: function (center, rx, ry, theta1, extent, angleDegrees) {
         var theta2 = theta1 + extent;
 
         theta1 = _degreesToRadians(theta1);
@@ -406,8 +442,14 @@ module.exports = (function(root) {
         var sweep = extent > 0 ? 1 : 0;
 
         return {
-          p1: { x: x0, y: y0 },
-          p2: { x: x1, y: y1 },
+          p1: {
+            x: x0,
+            y: y0
+          },
+          p2: {
+            x: x1,
+            y: y1
+          },
           rx: rx,
           ry: ry,
           angle: angle,
@@ -417,7 +459,7 @@ module.exports = (function(root) {
       },
 
       // convert from SVG format arc to center point arc
-      svgToCenter: function(p1, p2, rx, ry, angleDegrees, largearc, sweep) {
+      svgToCenter: function (p1, p2, rx, ry, angleDegrees, largearc, sweep) {
         var mid = {
           x: 0.5 * (p1.x + p2.x),
           y: 0.5 * (p1.y + p2.y)
@@ -491,7 +533,10 @@ module.exports = (function(root) {
         theta %= 360;
 
         return {
-          center: { x: cx, y: cy },
+          center: {
+            x: cx,
+            y: cy
+          },
           rx: rx,
           ry: ry,
           theta: theta,
@@ -502,7 +547,7 @@ module.exports = (function(root) {
     },
 
     // returns the rectangular bounding box of the given polygon
-    getPolygonBounds: function(polygon) {
+    getPolygonBounds: function (polygon) {
       if (!polygon || polygon.length < 3) {
         return null;
       }
@@ -535,7 +580,7 @@ module.exports = (function(root) {
     },
 
     // return true if point is in the polygon, false if outside, and null if exactly on a point or edge
-    pointInPolygon: function(point, polygon) {
+    pointInPolygon: function (point, polygon) {
       if (!polygon || polygon.length < 3) {
         return null;
       }
@@ -554,7 +599,13 @@ module.exports = (function(root) {
           return null; // no result
         }
 
-        if (_onSegment({ x: xi, y: yi }, { x: xj, y: yj }, point)) {
+        if (_onSegment({
+            x: xi,
+            y: yi
+          }, {
+            x: xj,
+            y: yj
+          }, point)) {
           return null; // exactly on the segment
         }
 
@@ -573,7 +624,7 @@ module.exports = (function(root) {
 
     // returns the area of the polygon, assuming no self-intersections
     // a negative area indicates counter-clockwise winding direction
-    polygonArea: function(polygon) {
+    polygonArea: function (polygon) {
       var area = 0;
       var i, j;
       for (i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
@@ -585,7 +636,7 @@ module.exports = (function(root) {
     // todo: swap this for a more efficient sweep-line implementation
     // returnEdges: if set, return all edges on A that have intersections
 
-    intersect: function(A, B) {
+    intersect: function (A, B) {
       var Aoffsetx = A.offsetx || 0;
       var Aoffsety = A.offsety || 0;
 
@@ -597,10 +648,22 @@ module.exports = (function(root) {
 
       for (var i = 0; i < A.length - 1; i++) {
         for (var j = 0; j < B.length - 1; j++) {
-          var a1 = { x: A[i].x + Aoffsetx, y: A[i].y + Aoffsety };
-          var a2 = { x: A[i + 1].x + Aoffsetx, y: A[i + 1].y + Aoffsety };
-          var b1 = { x: B[j].x + Boffsetx, y: B[j].y + Boffsety };
-          var b2 = { x: B[j + 1].x + Boffsetx, y: B[j + 1].y + Boffsety };
+          var a1 = {
+            x: A[i].x + Aoffsetx,
+            y: A[i].y + Aoffsety
+          };
+          var a2 = {
+            x: A[i + 1].x + Aoffsetx,
+            y: A[i + 1].y + Aoffsety
+          };
+          var b1 = {
+            x: B[j].x + Boffsetx,
+            y: B[j].y + Boffsety
+          };
+          var b2 = {
+            x: B[j + 1].x + Boffsetx,
+            y: B[j + 1].y + Boffsety
+          };
 
           var prevbindex = j == 0 ? B.length - 1 : j - 1;
           var prevaindex = i == 0 ? A.length - 1 : i - 1;
@@ -637,11 +700,23 @@ module.exports = (function(root) {
             nextaindex = nextaindex == A.length - 1 ? 0 : nextaindex + 1;
           }
 
-          var a0 = { x: A[prevaindex].x + Aoffsetx, y: A[prevaindex].y + Aoffsety };
-          var b0 = { x: B[prevbindex].x + Boffsetx, y: B[prevbindex].y + Boffsety };
+          var a0 = {
+            x: A[prevaindex].x + Aoffsetx,
+            y: A[prevaindex].y + Aoffsety
+          };
+          var b0 = {
+            x: B[prevbindex].x + Boffsetx,
+            y: B[prevbindex].y + Boffsety
+          };
 
-          var a3 = { x: A[nextaindex].x + Aoffsetx, y: A[nextaindex].y + Aoffsety };
-          var b3 = { x: B[nextbindex].x + Boffsetx, y: B[nextbindex].y + Boffsety };
+          var a3 = {
+            x: A[nextaindex].x + Aoffsetx,
+            y: A[nextaindex].y + Aoffsety
+          };
+          var b3 = {
+            x: B[nextbindex].x + Boffsetx,
+            y: B[nextbindex].y + Boffsety
+          };
 
           if (_onSegment(a1, a2, b1) || (_almostEqual(a1.x, b1.x) && _almostEqual(a1.y, b1.y))) {
             // if a point is on a segment, it could intersect or it could not. Check via the neighboring points
@@ -706,7 +781,7 @@ module.exports = (function(root) {
     // returns a continuous polyline representing the normal-most edge of the given polygon
     // eg. a normal vector of [-1, 0] will return the left-most edge of the polygon
     // this is essentially algo 8 in [1], generalized for any vector direction
-    polygonEdge: function(polygon, normal) {
+    polygonEdge: function (polygon, normal) {
       if (!polygon || polygon.length < 3) {
         return null;
       }
@@ -851,7 +926,7 @@ module.exports = (function(root) {
     // eg. normal of [-1, 0] returns the horizontal distance between the point and the line segment
     // sxinclusive: if true, include endpoints instead of excluding them
 
-    pointLineDistance: function(p, s1, s2, normal, s1inclusive, s2inclusive) {
+    pointLineDistance: function (p, s1, s2, normal, s1inclusive, s2inclusive) {
       normal = _normalizeVector(normal);
 
       var dir = {
@@ -915,7 +990,7 @@ module.exports = (function(root) {
       return pdotnorm - s1dotnorm + ((s1dotnorm - s2dotnorm) * (s1dot - pdot)) / (s1dot - s2dot);
     },
 
-    pointDistance: function(p, s1, s2, normal, infinite) {
+    pointDistance: function (p, s1, s2, normal, infinite) {
       normal = _normalizeVector(normal);
 
       var dir = {
@@ -959,7 +1034,7 @@ module.exports = (function(root) {
       return -(pdotnorm - s1dotnorm + ((s1dotnorm - s2dotnorm) * (s1dot - pdot)) / (s1dot - s2dot));
     },
 
-    segmentDistance: function(A, B, E, F, direction) {
+    segmentDistance: function (A, B, E, F, direction) {
       var normal = {
         x: direction.y,
         y: -direction.x
@@ -1020,8 +1095,14 @@ module.exports = (function(root) {
 
       // lines are colinear
       if (_almostEqual(crossABE, 0) && _almostEqual(crossABF, 0)) {
-        var ABnorm = { x: B.y - A.y, y: A.x - B.x };
-        var EFnorm = { x: F.y - E.y, y: E.x - F.x };
+        var ABnorm = {
+          x: B.y - A.y,
+          y: A.x - B.x
+        };
+        var EFnorm = {
+          x: F.y - E.y,
+          y: E.x - F.x
+        };
 
         var ABnormlength = Math.sqrt(ABnorm.x * ABnorm.x + ABnorm.y * ABnorm.y);
         ABnorm.x /= ABnormlength;
@@ -1124,7 +1205,7 @@ module.exports = (function(root) {
       return Math.min.apply(Math, distances);
     },
 
-    polygonSlideDistance: function(A, B, direction, ignoreNegative) {
+    polygonSlideDistance: function (A, B, direction, ignoreNegative) {
       var A1, A2, B1, B2, Aoffsetx, Aoffsety, Boffsetx, Boffsety;
 
       Aoffsetx = A.offsetx || 0;
@@ -1166,10 +1247,22 @@ module.exports = (function(root) {
       for (var i = 0; i < edgeB.length - 1; i++) {
         var mind = null;
         for (var j = 0; j < edgeA.length - 1; j++) {
-          A1 = { x: edgeA[j].x + Aoffsetx, y: edgeA[j].y + Aoffsety };
-          A2 = { x: edgeA[j + 1].x + Aoffsetx, y: edgeA[j + 1].y + Aoffsety };
-          B1 = { x: edgeB[i].x + Boffsetx, y: edgeB[i].y + Boffsety };
-          B2 = { x: edgeB[i + 1].x + Boffsetx, y: edgeB[i + 1].y + Boffsety };
+          A1 = {
+            x: edgeA[j].x + Aoffsetx,
+            y: edgeA[j].y + Aoffsety
+          };
+          A2 = {
+            x: edgeA[j + 1].x + Aoffsetx,
+            y: edgeA[j + 1].y + Aoffsety
+          };
+          B1 = {
+            x: edgeB[i].x + Boffsetx,
+            y: edgeB[i].y + Boffsety
+          };
+          B2 = {
+            x: edgeB[i + 1].x + Boffsetx,
+            y: edgeB[i + 1].y + Boffsety
+          };
 
           if (
             (_almostEqual(A1.x, A2.x) && _almostEqual(A1.y, A2.y)) ||
@@ -1191,7 +1284,7 @@ module.exports = (function(root) {
     },
 
     // project each point of B onto A in the given direction, and return the
-    polygonProjectionDistance: function(A, B, direction) {
+    polygonProjectionDistance: function (A, B, direction) {
       var Boffsetx = B.offsetx || 0;
       var Boffsety = B.offsety || 0;
 
@@ -1221,9 +1314,18 @@ module.exports = (function(root) {
         var minprojection = null;
         var minp = null;
         for (var j = 0; j < edgeA.length - 1; j++) {
-          p = { x: edgeB[i].x + Boffsetx, y: edgeB[i].y + Boffsety };
-          s1 = { x: edgeA[j].x + Aoffsetx, y: edgeA[j].y + Aoffsety };
-          s2 = { x: edgeA[j + 1].x + Aoffsetx, y: edgeA[j + 1].y + Aoffsety };
+          p = {
+            x: edgeB[i].x + Boffsetx,
+            y: edgeB[i].y + Boffsety
+          };
+          s1 = {
+            x: edgeA[j].x + Aoffsetx,
+            y: edgeA[j].y + Aoffsety
+          };
+          s2 = {
+            x: edgeA[j + 1].x + Aoffsetx,
+            y: edgeA[j + 1].y + Aoffsety
+          };
 
           if (Math.abs((s2.y - s1.y) * direction.x - (s2.x - s1.x) * direction.y) < TOL) {
             continue;
@@ -1247,7 +1349,7 @@ module.exports = (function(root) {
 
     // searches for an arrangement of A and B such that they do not overlap
     // if an NFP is given, only search for startpoints that have not already been traversed in the given NFP
-    searchStartPoint: function(A, B, inside, NFP) {
+    searchStartPoint: function (A, B, inside, NFP) {
       // clone arrays
       A = A.slice(0);
       B = B.slice(0);
@@ -1270,7 +1372,10 @@ module.exports = (function(root) {
 
             var Binside = null;
             for (var k = 0; k < B.length; k++) {
-              var inpoly = this.pointInPolygon({ x: B[k].x + B.offsetx, y: B[k].y + B.offsety }, A);
+              var inpoly = this.pointInPolygon({
+                x: B[k].x + B.offsetx,
+                y: B[k].y + B.offsety
+              }, A);
               if (inpoly !== null) {
                 Binside = inpoly;
                 break;
@@ -1282,7 +1387,10 @@ module.exports = (function(root) {
               return null;
             }
 
-            var startPoint = { x: B.offsetx, y: B.offsety };
+            var startPoint = {
+              x: B.offsetx,
+              y: B.offsety
+            };
             if (
               ((Binside && inside) || (!Binside && !inside)) &&
               !this.intersect(A, B) &&
@@ -1295,8 +1403,14 @@ module.exports = (function(root) {
             var vx = A[i + 1].x - A[i].x;
             var vy = A[i + 1].y - A[i].y;
 
-            var d1 = this.polygonProjectionDistance(A, B, { x: vx, y: vy });
-            var d2 = this.polygonProjectionDistance(B, A, { x: -vx, y: -vy });
+            var d1 = this.polygonProjectionDistance(A, B, {
+              x: vx,
+              y: vy
+            });
+            var d2 = this.polygonProjectionDistance(B, A, {
+              x: -vx,
+              y: -vy
+            });
 
             var d = null;
 
@@ -1313,8 +1427,7 @@ module.exports = (function(root) {
 
             // only slide until no longer negative
             // todo: clean this up
-            if (d !== null && !_almostEqual(d, 0) && d > 0) {
-            } else {
+            if (d !== null && !_almostEqual(d, 0) && d > 0) {} else {
               continue;
             }
 
@@ -1330,13 +1443,19 @@ module.exports = (function(root) {
             B.offsety += vy;
 
             for (k = 0; k < B.length; k++) {
-              var inpoly = this.pointInPolygon({ x: B[k].x + B.offsetx, y: B[k].y + B.offsety }, A);
+              var inpoly = this.pointInPolygon({
+                x: B[k].x + B.offsetx,
+                y: B[k].y + B.offsety
+              }, A);
               if (inpoly !== null) {
                 Binside = inpoly;
                 break;
               }
             }
-            startPoint = { x: B.offsetx, y: B.offsety };
+            startPoint = {
+              x: B.offsetx,
+              y: B.offsety
+            };
             if (
               ((Binside && inside) || (!Binside && !inside)) &&
               !this.intersect(A, B) &&
@@ -1368,7 +1487,7 @@ module.exports = (function(root) {
       return null;
     },
 
-    isRectangle: function(poly, tolerance) {
+    isRectangle: function (poly, tolerance) {
       var bb = this.getPolygonBounds(poly);
       tolerance = tolerance || TOL;
 
@@ -1385,7 +1504,7 @@ module.exports = (function(root) {
     },
 
     // returns an interior NFP for the special case where A is a rectangle
-    noFitPolygonRectangle: function(A, B) {
+    noFitPolygonRectangle: function (A, B) {
       var minAx = A[0].x;
       var minAy = A[0].y;
       var maxAx = A[0].x;
@@ -1433,11 +1552,22 @@ module.exports = (function(root) {
       }
 
       return [
-        [
-          { x: minAx - minBx + B[0].x, y: minAy - minBy + B[0].y },
-          { x: maxAx - maxBx + B[0].x, y: minAy - minBy + B[0].y },
-          { x: maxAx - maxBx + B[0].x, y: maxAy - maxBy + B[0].y },
-          { x: minAx - minBx + B[0].x, y: maxAy - maxBy + B[0].y }
+        [{
+            x: minAx - minBx + B[0].x,
+            y: minAy - minBy + B[0].y
+          },
+          {
+            x: maxAx - maxBx + B[0].x,
+            y: minAy - minBy + B[0].y
+          },
+          {
+            x: maxAx - maxBx + B[0].x,
+            y: maxAy - maxBy + B[0].y
+          },
+          {
+            x: minAx - minBx + B[0].x,
+            y: maxAy - maxBy + B[0].y
+          }
         ]
       ];
     },
@@ -1445,7 +1575,7 @@ module.exports = (function(root) {
     // given a static polygon A and a movable polygon B, compute a no fit polygon by orbiting B about A
     // if the inside flag is set, B is orbited inside of A rather than outside
     // if the searchEdges flag is set, all edges of A are explored for NFPs - multiple
-    noFitPolygon: function(A, B, inside, searchEdges) {
+    noFitPolygon: function (A, B, inside, searchEdges) {
       if (!A || A.length < 3 || !B || B.length < 3) {
         return null;
       }
@@ -1498,12 +1628,10 @@ module.exports = (function(root) {
         var touching;
 
         var prevvector = null; // keep track of previous vector
-        var NFP = [
-          {
-            x: B[0].x + B.offsetx,
-            y: B[0].y + B.offsety
-          }
-        ];
+        var NFP = [{
+          x: B[0].x + B.offsetx,
+          y: B[0].y + B.offsety
+        }];
 
         var referencex = B[0].x + B.offsetx;
         var referencey = B[0].y + B.offsety;
@@ -1523,19 +1651,38 @@ module.exports = (function(root) {
                 _almostEqual(A[i].x, B[j].x + B.offsetx) &&
                 _almostEqual(A[i].y, B[j].y + B.offsety)
               ) {
-                touching.push({ type: 0, A: i, B: j });
+                touching.push({
+                  type: 0,
+                  A: i,
+                  B: j
+                });
               } else if (
-                _onSegment(A[i], A[nexti], { x: B[j].x + B.offsetx, y: B[j].y + B.offsety })
+                _onSegment(A[i], A[nexti], {
+                  x: B[j].x + B.offsetx,
+                  y: B[j].y + B.offsety
+                })
               ) {
-                touching.push({ type: 1, A: nexti, B: j });
+                touching.push({
+                  type: 1,
+                  A: nexti,
+                  B: j
+                });
               } else if (
-                _onSegment(
-                  { x: B[j].x + B.offsetx, y: B[j].y + B.offsety },
-                  { x: B[nextj].x + B.offsetx, y: B[nextj].y + B.offsety },
+                _onSegment({
+                    x: B[j].x + B.offsetx,
+                    y: B[j].y + B.offsety
+                  }, {
+                    x: B[nextj].x + B.offsetx,
+                    y: B[nextj].y + B.offsety
+                  },
                   A[i]
                 )
               ) {
-                touching.push({ type: 2, A: i, B: nextj });
+                touching.push({
+                  type: 2,
+                  A: i,
+                  B: nextj
+                });
               }
             }
           }
@@ -1650,10 +1797,16 @@ module.exports = (function(root) {
               var vectorlength = Math.sqrt(
                 vectors[i].x * vectors[i].x + vectors[i].y * vectors[i].y
               );
-              var unitv = { x: vectors[i].x / vectorlength, y: vectors[i].y / vectorlength };
+              var unitv = {
+                x: vectors[i].x / vectorlength,
+                y: vectors[i].y / vectorlength
+              };
 
               var prevlength = Math.sqrt(prevvector.x * prevvector.x + prevvector.y * prevvector.y);
-              var prevunit = { x: prevvector.x / prevlength, y: prevvector.y / prevlength };
+              var prevunit = {
+                x: prevvector.x / prevlength,
+                y: prevvector.y / prevlength
+              };
 
               // we need to scale down to unit vectors to normalize vector length. Could also just do a tan here
               if (Math.abs(unitv.y * prevunit.x - unitv.x * prevunit.y) < 0.0001) {
@@ -1745,7 +1898,7 @@ module.exports = (function(root) {
 
     // given two polygons that touch at at least one point, but do not intersect. Return the outer perimeter of both polygons as a single continuous polygon
     // A and B must have the same winding direction
-    polygonHull: function(A, B) {
+    polygonHull: function (A, B) {
       if (!A || A.length < 3 || !B || B.length < 3) {
         return null;
       }
@@ -1807,31 +1960,56 @@ module.exports = (function(root) {
             _almostEqual(A[current].x + Aoffsetx, B[j].x + Boffsetx) &&
             _almostEqual(A[current].y + Aoffsety, B[j].y + Boffsety)
           ) {
-            C.push({ x: A[current].x + Aoffsetx, y: A[current].y + Aoffsety });
+            C.push({
+              x: A[current].x + Aoffsetx,
+              y: A[current].y + Aoffsety
+            });
             intercept1 = j;
             touching = true;
             break;
           } else if (
-            _onSegment(
-              { x: A[current].x + Aoffsetx, y: A[current].y + Aoffsety },
-              { x: A[next].x + Aoffsetx, y: A[next].y + Aoffsety },
-              { x: B[j].x + Boffsetx, y: B[j].y + Boffsety }
-            )
+            _onSegment({
+              x: A[current].x + Aoffsetx,
+              y: A[current].y + Aoffsety
+            }, {
+              x: A[next].x + Aoffsetx,
+              y: A[next].y + Aoffsety
+            }, {
+              x: B[j].x + Boffsetx,
+              y: B[j].y + Boffsety
+            })
           ) {
-            C.push({ x: A[current].x + Aoffsetx, y: A[current].y + Aoffsety });
-            C.push({ x: B[j].x + Boffsetx, y: B[j].y + Boffsety });
+            C.push({
+              x: A[current].x + Aoffsetx,
+              y: A[current].y + Aoffsety
+            });
+            C.push({
+              x: B[j].x + Boffsetx,
+              y: B[j].y + Boffsety
+            });
             intercept1 = j;
             touching = true;
             break;
           } else if (
-            _onSegment(
-              { x: B[j].x + Boffsetx, y: B[j].y + Boffsety },
-              { x: B[nextj].x + Boffsetx, y: B[nextj].y + Boffsety },
-              { x: A[current].x + Aoffsetx, y: A[current].y + Aoffsety }
-            )
+            _onSegment({
+              x: B[j].x + Boffsetx,
+              y: B[j].y + Boffsety
+            }, {
+              x: B[nextj].x + Boffsetx,
+              y: B[nextj].y + Boffsety
+            }, {
+              x: A[current].x + Aoffsetx,
+              y: A[current].y + Aoffsety
+            })
           ) {
-            C.push({ x: A[current].x + Aoffsetx, y: A[current].y + Aoffsety });
-            C.push({ x: B[nextj].x + Boffsetx, y: B[nextj].y + Boffsety });
+            C.push({
+              x: A[current].x + Aoffsetx,
+              y: A[current].y + Aoffsety
+            });
+            C.push({
+              x: B[nextj].x + Boffsetx,
+              y: B[nextj].y + Boffsety
+            });
             intercept1 = nextj;
             touching = true;
             break;
@@ -1842,7 +2020,10 @@ module.exports = (function(root) {
           break;
         }
 
-        C.push({ x: A[current].x + Aoffsetx, y: A[current].y + Aoffsety });
+        C.push({
+          x: A[current].x + Aoffsetx,
+          y: A[current].y + Aoffsety
+        });
 
         current++;
       }
@@ -1859,30 +2040,52 @@ module.exports = (function(root) {
             _almostEqual(A[current].x + Aoffsetx, B[j].x + Boffsetx) &&
             _almostEqual(A[current].y, B[j].y + Boffsety)
           ) {
-            C.unshift({ x: A[current].x + Aoffsetx, y: A[current].y + Aoffsety });
+            C.unshift({
+              x: A[current].x + Aoffsetx,
+              y: A[current].y + Aoffsety
+            });
             intercept2 = j;
             touching = true;
             break;
           } else if (
-            _onSegment(
-              { x: A[current].x + Aoffsetx, y: A[current].y + Aoffsety },
-              { x: A[next].x + Aoffsetx, y: A[next].y + Aoffsety },
-              { x: B[j].x + Boffsetx, y: B[j].y + Boffsety }
-            )
+            _onSegment({
+              x: A[current].x + Aoffsetx,
+              y: A[current].y + Aoffsety
+            }, {
+              x: A[next].x + Aoffsetx,
+              y: A[next].y + Aoffsety
+            }, {
+              x: B[j].x + Boffsetx,
+              y: B[j].y + Boffsety
+            })
           ) {
-            C.unshift({ x: A[current].x + Aoffsetx, y: A[current].y + Aoffsety });
-            C.unshift({ x: B[j].x + Boffsetx, y: B[j].y + Boffsety });
+            C.unshift({
+              x: A[current].x + Aoffsetx,
+              y: A[current].y + Aoffsety
+            });
+            C.unshift({
+              x: B[j].x + Boffsetx,
+              y: B[j].y + Boffsety
+            });
             intercept2 = j;
             touching = true;
             break;
           } else if (
-            _onSegment(
-              { x: B[j].x + Boffsetx, y: B[j].y + Boffsety },
-              { x: B[nextj].x + Boffsetx, y: B[nextj].y + Boffsety },
-              { x: A[current].x + Aoffsetx, y: A[current].y + Aoffsety }
-            )
+            _onSegment({
+              x: B[j].x + Boffsetx,
+              y: B[j].y + Boffsety
+            }, {
+              x: B[nextj].x + Boffsetx,
+              y: B[nextj].y + Boffsety
+            }, {
+              x: A[current].x + Aoffsetx,
+              y: A[current].y + Aoffsety
+            })
           ) {
-            C.unshift({ x: A[current].x + Aoffsetx, y: A[current].y + Aoffsety });
+            C.unshift({
+              x: A[current].x + Aoffsetx,
+              y: A[current].y + Aoffsety
+            });
             intercept2 = j;
             touching = true;
             break;
@@ -1893,7 +2096,10 @@ module.exports = (function(root) {
           break;
         }
 
-        C.unshift({ x: A[current].x + Aoffsetx, y: A[current].y + Aoffsety });
+        C.unshift({
+          x: A[current].x + Aoffsetx,
+          y: A[current].y + Aoffsety
+        });
 
         current--;
       }
@@ -1907,7 +2113,10 @@ module.exports = (function(root) {
       current = intercept1 + 1;
       for (i = 0; i < B.length; i++) {
         current = current == B.length ? 0 : current;
-        C.push({ x: B[current].x + Boffsetx, y: B[current].y + Boffsety });
+        C.push({
+          x: B[current].x + Boffsetx,
+          y: B[current].y + Boffsety
+        });
 
         if (current == intercept2) {
           break;
@@ -1928,7 +2137,7 @@ module.exports = (function(root) {
       return C;
     },
 
-    rotatePolygon: function(polygon, angle) {
+    rotatePolygon: function (polygon, angle) {
       var rotated = [];
       angle = (angle * Math.PI) / 180;
       for (var i = 0; i < polygon.length; i++) {
@@ -1937,7 +2146,10 @@ module.exports = (function(root) {
         var x1 = x * Math.cos(angle) - y * Math.sin(angle);
         var y1 = x * Math.sin(angle) + y * Math.cos(angle);
 
-        rotated.push({ x: x1, y: y1 });
+        rotated.push({
+          x: x1,
+          y: y1
+        });
       }
       // reset bounding box
       var bounds = GeometryUtil.getPolygonBounds(rotated);
