@@ -147,5 +147,18 @@ Matrix.prototype.calc = function (x, y, isRelative) {
   ];
 };
 
+Matrix.prototype.isIdentity = function () {
+  if (!this.cache) {
+    this.cache = this.toArray();
+  }
+
+  var m = this.cache;
+
+  if (m[0] === 1 && m[1] === 0 && m[2] === 0 && m[3] === 1 && m[4] === 0 && m[5] === 0) {
+    return true;
+  }
+  return false;
+}
+
 
 module.exports = Matrix;
