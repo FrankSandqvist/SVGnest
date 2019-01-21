@@ -3,15 +3,17 @@
  * Licensed under the MIT license
  */
 
-import SvgParser from "./svgparser";
-import GeometryUtil = require("./util/geometryutil"); // Needs GeometryUtil.getPolygonBounds, GeometryUtil.almostEqual, GeometryUtil.polygonArea, eometryUtil.pointInPolygon, GeometryUtil.rotatePolygon, GeometryUtil.Arc.linearize, GeometryUtil.CubicBezier.linearize, GeometryUtil.QuadraticBezier.linearize
-import Parallel = require("./util/parallel");
-import * as ClipperLib from "./util/clipper";
+import SvgParser from './svgparser';
+import * as GeometryUtil from './util/geometryutil'; // Needs this.geometryUtil.getPolygonBounds, this.geometryUtil.almostEqual, this.geometryUtil.polygonArea, eometryUtil.pointInPolygon, this.geometryUtil.rotatePolygon, this.geometryUtil.Arc.linearize, this.geometryUtil.CubicBezier.linearize, this.geometryUtil.QuadraticBezier.linearize
+import * as ClipperLib from './util/clipper';
 
 export default class SvgNest {
   private svgParser: SvgParser;
+  private geometryUtil: GeometryUtil;
+
   constructor() {
     this.svgParser = new SvgParser();
+    this.geometryUtil = new GeometryUtil();
   }
 
   private self = this;
@@ -61,6 +63,8 @@ export default class SvgNest {
 
     this.svg = this.svgParser.cleanInput();
 
+    console.log('THISSVG', this.svg);
+
     this.tree = this.getParts(this.svg.children);
 
     //re-order elements such that deeper elements are on top, so they can be moused over
@@ -93,14 +97,11 @@ export default class SvgNest {
       return config;
     }
 
-    if (
-      c.curveTolerance &&
-      !GeometryUtil.almostEqual(parseFloat(c.curveTolerance), 0)
-    ) {
+    if (c.curveTolerance && !this.geometryUtil.almostEqual(parseFloat(c.curveTolerance), 0)) {
       config.curveTolerance = parseFloat(c.curveTolerance);
     }
 
-    if ("spacing" in c) {
+    if ('spacing' in c) {
       config.spacing = parseFloat(c.spacing);
     }
 
@@ -116,11 +117,11 @@ export default class SvgNest {
       config.mutationRate = parseInt(c.mutationRate);
     }
 
-    if ("useHoles" in c) {
+    if ('useHoles' in c) {
       config.useHoles = !!c.useHoles;
     }
 
-    if ("exploreConcave" in c) {
+    if ('exploreConcave' in c) {
       config.exploreConcave = !!c.exploreConcave;
     }
 
@@ -135,16 +136,7 @@ export default class SvgNest {
   }
 
   start(progressCallback, displayCallback) {
-    let {
-      svg,
-      bin,
-      parts,
-      tree,
-      config,
-      binPolygon,
-      binBounds,
-      workerTimer
-    } = this;
+    let { svg, bin, parts, tree, config, binPolygon, binBounds, workerTimer } = this;
     if (!svg || !bin) {
       return false;
     }
@@ -168,10 +160,7 @@ export default class SvgNest {
         var offsetpaths = offsetFunction(t[i], offset);
         if (offsetpaths.length == 1) {
           // replace array items in place
-          Array.prototype.splice.apply(
-            t[i],
-            [0, t[i].length].concat(offsetpaths[0])
-          );
+          Array.prototype.splice.apply(t[i], [0, t[i].length].concat(offsetpaths[0]));
         }
 
         if (t[i].children && t[i].children.length > 0) {
@@ -187,7 +176,7 @@ export default class SvgNest {
       return false;
     }
 
-    binBounds = GeometryUtil.getPolygonBounds(binPolygon);
+    binBounds = this.geometryUtil.getPolygonBounds(binPolygon);
 
     if (config.spacing > 0) {
       var offsetBin = this.polygonOffset(binPolygon, -0.5 * config.spacing);
@@ -227,7 +216,7 @@ export default class SvgNest {
     binPolygon.height = ybinmax - ybinmin;
 
     // all paths need to have the same winding direction
-    if (GeometryUtil.polygonArea(binPolygon) > 0) {
+    if (this.geometryUtil.polygonArea(binPolygon) > 0) {
       binPolygon.reverse();
     }
 
@@ -237,13 +226,13 @@ export default class SvgNest {
       var end = tree[i][tree[i].length - 1];
       if (
         start == end ||
-        (GeometryUtil.almostEqual(start.x, end.x) &&
-          GeometryUtil.almostEqual(start.y, end.y))
+        (this.geometryUtil.almostEqual(start.x, end.x) &&
+          this.geometryUtil.almostEqual(start.y, end.y))
       ) {
         tree[i].pop();
       }
 
-      if (GeometryUtil.polygonArea(tree[i]) > 0) {
+      if (this.geometryUtil.polygonArea(tree[i]) > 0) {
         tree[i].reverse();
       }
     }
@@ -253,14 +242,7 @@ export default class SvgNest {
 
     workerTimer = setInterval(function() {
       if (!self.working) {
-        self.launchWorkers.call(
-          self,
-          tree,
-          binPolygon,
-          config,
-          progressCallback,
-          displayCallback
-        );
+        self.launchWorkers.call(self, tree, binPolygon, config, progressCallback, displayCallback);
         self.working = true;
       }
 
@@ -299,8 +281,7 @@ export default class SvgNest {
       // seed with decreasing area
       adam.sort(function(a, b) {
         return (
-          Math.abs(GeometryUtil.polygonArea(b)) -
-          Math.abs(GeometryUtil.polygonArea(a))
+          Math.abs(this.geometryUtil.polygonArea(b)) - Math.abs(this.geometryUtil.polygonArea(a))
         );
       });
 
@@ -371,10 +352,12 @@ export default class SvgNest {
     nfpCache = newCache;
 
     //workers here!
-    console.warn("No Workers!");
+    console.warn('No Workers!');
   }
 
   getParts(paths) {
+    console.log('GETPARTS');
+
     let { config } = this;
 
     var i, j;
@@ -383,24 +366,24 @@ export default class SvgNest {
     var numChildren = paths.length;
     for (i = 0; i < numChildren; i++) {
       var poly = this.svgParser.polygonify(paths[i]);
+
+      console.log('POLY', poly);
+
       poly = this.cleanPolygon(poly);
 
       // todo: warn user if poly could not be processed and is excluded from the nest
       if (
         poly &&
         poly.length > 2 &&
-        Math.abs(GeometryUtil.polygonArea(poly)) >
+        Math.abs(this.geometryUtil.polygonArea(poly)) >
           config.curveTolerance * config.curveTolerance
       ) {
-        poly["source"] = i;
+        poly['source'] = i;
         polygons.push(poly);
       }
     }
 
-    // turn the list into a tree
-    toTree(polygons);
-
-    function toTree(list, idstart?) {
+    const toTree = (list, idstart?) => {
       var parents = [];
       var i, j;
 
@@ -415,7 +398,7 @@ export default class SvgNest {
           if (j == i) {
             continue;
           }
-          if (GeometryUtil.pointInPolygon(p[0], list[j]) === true) {
+          if (this.geometryUtil.pointInPolygon(p[0], list[j]) === true) {
             if (!list[j].children) {
               list[j].children = [];
             }
@@ -450,29 +433,27 @@ export default class SvgNest {
       }
 
       return id;
-    }
+    };
+
+    // turn the list into a tree
+    toTree(polygons);
+
+    console.log('POLYGONS', polygons);
 
     return polygons;
   }
 
   polygonOffset(polygon, offset) {
     let { config } = this;
-    if (!offset || offset == 0 || GeometryUtil.almostEqual(offset, 0)) {
+    if (!offset || offset == 0 || this.geometryUtil.almostEqual(offset, 0)) {
       return polygon;
     }
 
     var p = this.svgToClipper(polygon);
 
     var miterLimit = 2;
-    var co = new ClipperLib.ClipperOffset(
-      miterLimit,
-      config.curveTolerance * config.clipperScale
-    );
-    co.AddPath(
-      p,
-      ClipperLib.JoinType.jtRound,
-      ClipperLib.EndType.etClosedPolygon
-    );
+    var co = new ClipperLib.ClipperOffset(miterLimit, config.curveTolerance * config.clipperScale);
+    co.AddPath(p, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
 
     var newpaths: any = new ClipperLib.Paths();
     co.Execute(newpaths, offset * config.clipperScale);
@@ -488,10 +469,7 @@ export default class SvgNest {
   cleanPolygon(polygon) {
     var p = this.svgToClipper(polygon);
     // remove self-intersections and find the biggest polygon that's left
-    var simple = ClipperLib.Clipper.SimplifyPolygon(
-      p,
-      ClipperLib.PolyFillType.pftNonZero
-    );
+    var simple = ClipperLib.Clipper.SimplifyPolygon(p, ClipperLib.PolyFillType.pftNonZero);
 
     if (!simple || simple.length == 0) {
       return null;
@@ -556,19 +534,13 @@ export default class SvgNest {
 
     for (i = 0; i < placement.length; i++) {
       var newsvg = svg.cloneNode(false);
-      newsvg.setAttribute(
-        "viewBox",
-        "0 0 " + binBounds.width + " " + binBounds.height
-      );
-      newsvg.setAttribute("width", binBounds.width + "px");
-      newsvg.setAttribute("height", binBounds.height + "px");
+      newsvg.setAttribute('viewBox', '0 0 ' + binBounds.width + ' ' + binBounds.height);
+      newsvg.setAttribute('width', binBounds.width + 'px');
+      newsvg.setAttribute('height', binBounds.height + 'px');
       var binclone = bin.cloneNode(false);
 
-      binclone.setAttribute("class", "bin");
-      binclone.setAttribute(
-        "transform",
-        "translate(" + -binBounds.x + " " + -binBounds.y + ")"
-      );
+      binclone.setAttribute('class', 'bin');
+      binclone.setAttribute('transform', 'translate(' + -binBounds.x + ' ' + -binBounds.y + ')');
       newsvg.appendChild(binclone);
 
       for (j = 0; j < placement[i].length; j++) {
@@ -576,10 +548,10 @@ export default class SvgNest {
         var part = tree[p.id];
 
         // the original path could have transforms and stuff on it, so apply our transforms on a group
-        var partgroup = document.createElementNS(svg.namespaceURI, "g");
+        var partgroup = document.createElementNS(svg.namespaceURI, 'g');
         partgroup.setAttribute(
-          "transform",
-          "translate(" + p.x + " " + p.y + ") rotate(" + p.rotation + ")"
+          'transform',
+          'translate(' + p.x + ' ' + p.y + ') rotate(' + p.rotation + ')'
         );
         partgroup.appendChild(clone[part.source]);
 
@@ -590,10 +562,9 @@ export default class SvgNest {
             // add class to indicate hole
             if (
               flattened[k].hole &&
-              (!c.getAttribute("class") ||
-                c.getAttribute("class").indexOf("hole") < 0)
+              (!c.getAttribute('class') || c.getAttribute('class').indexOf('hole') < 0)
             ) {
-              c.setAttribute("class", c.getAttribute("class") + " hole");
+              c.setAttribute('class', c.getAttribute('class') + ' hole');
             }
             partgroup.appendChild(c);
           }
@@ -634,13 +605,15 @@ class GeneticAlgorithm {
   private config;
   private binBounds;
   private population;
+  private geometryUtil: GeometryUtil;
+
   constructor(adam, bin, config) {
     this.config = config || {
       populationSize: 10,
       mutationRate: 10,
       rotations: 4
     };
-    this.binBounds = GeometryUtil.getPolygonBounds(bin);
+    this.binBounds = this.geometryUtil.getPolygonBounds(bin);
 
     let angles = [];
     for (var i = 0; i < adam.length; i++) {
@@ -653,6 +626,7 @@ class GeneticAlgorithm {
       var mutant = this.mutate(this.population[0]);
       this.population.push(mutant);
     }
+    this.geometryUtil = new GeometryUtil();
   }
 
   // returns a random angle of insertion
@@ -674,13 +648,10 @@ class GeneticAlgorithm {
     angleList = shuffleArray(angleList);
 
     for (i = 0; i < angleList.length; i++) {
-      var rotatedPart = GeometryUtil.rotatePolygon(part, angleList[i]);
+      var rotatedPart = this.geometryUtil.rotatePolygon(part, angleList[i]);
 
       // don't use obviously bad angles where the part doesn't fit in the bin
-      if (
-        rotatedPart.width < this.binBounds.width &&
-        rotatedPart.height < this.binBounds.height
-      ) {
+      if (rotatedPart.width < this.binBounds.width && rotatedPart.height < this.binBounds.height) {
         return angleList[i];
       }
     }
@@ -753,10 +724,7 @@ class GeneticAlgorithm {
       return false;
     }
 
-    return [
-      { placement: gene1, rotation: rot1 },
-      { placement: gene2, rotation: rot2 }
-    ];
+    return [{ placement: gene1, rotation: rot1 }, { placement: gene2, rotation: rot2 }];
   }
 
   generation() {

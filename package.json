@@ -9,7 +9,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "jsdom": "^13.1.0"
+    "@types/jsdom": "^12.2.1",
+    "@types/xml2js": "^0.4.3",
+    "jsdom": "^13.1.0",
+    "xml2js": "^0.4.19"
   },
   "devDependencies": {
     "@types/node": "^10.12.18"

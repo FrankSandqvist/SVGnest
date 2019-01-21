@@ -1,7 +1,9 @@
-//import SvgParser from "./src/svgparser";
-import SvgNest from "./src/svgnest";
-import { readFileSync } from "fs";
+import { readFileSync } from 'fs';
+import { SVGNester } from './src/index';
 
-const svgNest = new SvgNest();
+const binXML = readFileSync('./test.svg', 'utf-8');
+const partsXML = [readFileSync('./test.svg', 'utf-8'), readFileSync('./test.svg', 'utf-8')];
 
-svgNest.parsesvg(readFileSync("./test.svg", "utf-8"));
+const svgNester = new SVGNester(binXML, partsXML);
+
+svgNester.parseToJS().then();
