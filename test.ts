@@ -1,8 +1,12 @@
 import { readFileSync } from 'fs';
 import { SVGNester } from './src/index';
 
-const binXML = readFileSync('./test.svg', 'utf-8');
-const partsXML = [readFileSync('./test.svg', 'utf-8'), readFileSync('./test.svg', 'utf-8')];
+const binXML = readFileSync('./testfiles/bin.svg', 'utf-8');
+/*const partsXML = ['star', 'circ1', 'circ2', 'rectangle'].map(name =>
+  readFileSync(`./testfiles/${name}.svg`, 'utf8')
+);*/
+
+const partsXML = ['grouptest'].map(name => readFileSync(`./testfiles/${name}.svg`, 'utf8'));
 
 const svgNester = new SVGNester(binXML, partsXML);
 

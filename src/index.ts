@@ -2,8 +2,8 @@ import { Parser } from 'xml2js';
 import { writeFileSync } from 'fs';
 
 export class SVGNester {
-  bin: object;
-  elements: object[];
+  bin: any;
+  elements: any[];
 
   constructor(private binXML: string, private partsXML: string[]) {}
 
@@ -28,6 +28,6 @@ export class SVGNester {
 
     console.log(this.bin);
 
-    writeFileSync('result.json', JSON.stringify(this.bin), 'utf8');
+    writeFileSync('result.json', JSON.stringify(this.elements[0]), 'utf8');
   }
 }
