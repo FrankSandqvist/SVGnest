@@ -10,8 +10,10 @@
   "license": "ISC",
   "dependencies": {
     "@types/jsdom": "^12.2.1",
+    "@types/lodash": "^4.14.120",
     "@types/xml2js": "^0.4.3",
     "jsdom": "^13.1.0",
+    "lodash": "^4.17.11",
     "xml2js": "^0.4.19"
   },
   "devDependencies": {
