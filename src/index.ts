@@ -128,7 +128,6 @@ export class SVGNester {
     });
     const newElement = element;
     newElement.svg.path = _.flatten(newPath);
-    //console.log(JSON.stringify(newElement, null, 1));
     return newElement;
   }
 
