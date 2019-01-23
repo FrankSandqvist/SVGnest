@@ -1,7 +1,7 @@
 import { Parser, Builder } from "xml2js";
 import { writeFileSync } from "fs";
 import * as _ from "lodash";
-import * as svgPath from 'svg-path';
+import * as svgPath from "svg-path";
 
 export class SVGNester {
   bin: any;
@@ -30,22 +30,19 @@ export class SVGNester {
 
     //console.log(this.bin);
 
-    /*writeFileSync(
-      "result.json",
-      JSON.stringify(this.flatten(this.elements[0].svg), null, 2),
-      "utf8"
-    );*/
-
     const builder = new Builder();
     const flattened = this.flatten(this.elements[0]);
-    const xml = builder.buildObject(flattened);
-    //writeFileSync("result.json", JSON.stringify(flattened), "utf8");
+    const splited = this.splitPath(flattened);
+    const xml = builder.buildObject(splited);
 
     const parsedSVG = svgPath(flattened.svg.path[0].$.d);
 
     // [path, path, path, path, path]
 
-    writeFileSync("result.json", JSON.stringify(parsedSVG), "utf8");
+    writeFileSync("result.json", JSON.stringify(parsedSVG, null, 2), "utf8");
+    writeFileSync("result.svg", xml, "utf8");
+
+    writeFileSync("resultSVG.json", JSON.stringify(splited, null, 2), "utf8");
   }
 
   flatten(element, paths?) {
@@ -82,7 +79,60 @@ export class SVGNester {
       }
     }
   }
-/*
+
+  splitPath(input) {
+    const element = deepCopy(input);
+    let newPath = [];
+    element.svg.path.forEach(path => {
+      const data = svgPath(path.$.d);
+
+      let pathSplited = [];
+      let workingOn;
+      data.content.forEach(pathContent => {
+        if (pathContent.type == "M") {
+        } else if (pathContent.type == "L") {
+        }
+        switch (pathContent.type) {
+          case "M":
+            if (workingOn != null) {
+              pathSplited.push(deepCopy(workingOn));
+            }
+            workingOn = { $: path.$ };
+            workingOn.$.d = `M${pathContent.x} ${pathContent.y}`;
+            break;
+
+          case "L":
+            workingOn.$.d += ` ${pathContent.type + pathContent.x} ${
+              pathContent.y
+            }`;
+            break;
+
+          case "C":
+            workingOn.$.d += ` ${pathContent.type + pathContent.x1} ${
+              pathContent.y1
+            }, ${pathContent.x2} ${pathContent.y2}, ${pathContent.x} ${
+              pathContent.y
+            }`;
+            break;
+
+          case "Z":
+            workingOn.$.d += ` Z`;
+            break;
+
+          default:
+            console.log(pathContent.type + " is not supported");
+            break;
+        }
+      });
+      newPath.push(pathSplited);
+    });
+    const newElement = element;
+    newElement.svg.path = _.flatten(newPath);
+    //console.log(JSON.stringify(newElement, null, 1));
+    return newElement;
+  }
+
+  /*
   splitPath(path: string) {
     if (!path || path.tagName != 'path' || !path.parentElement) {
       return false;
@@ -166,3 +216,38 @@ export class SVGNester {
   }
 */
 }
+
+const deepCopy = obj => {
+  //https://stackoverflow.com/a/28152032/9125965
+  let copy;
+
+  // Handle the 3 simple types, and null or undefined
+  if (null == obj || "object" != typeof obj) return obj;
+
+  // Handle Date
+  if (obj instanceof Date) {
+    copy = new Date();
+    copy.setTime(obj.getTime());
+    return copy;
+  }
+
+  // Handle Array
+  if (obj instanceof Array) {
+    copy = [];
+    for (var i = 0, len = obj.length; i < len; i++) {
+      copy[i] = deepCopy(obj[i]);
+    }
+    return copy;
+  }
+
+  // Handle Object
+  if (obj instanceof Object) {
+    copy = {};
+    for (var attr in obj) {
+      if (obj.hasOwnProperty(attr)) copy[attr] = deepCopy(obj[attr]);
+    }
+    return copy;
+  }
+
+  throw new Error("Unable to copy obj! Its type isn't supported.");
+};
