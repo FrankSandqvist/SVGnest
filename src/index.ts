@@ -1,6 +1,7 @@
 import { Parser, Builder } from "xml2js";
 import { writeFileSync } from "fs";
 import * as _ from "lodash";
+import * as svgPath from 'svg-path';
 
 export class SVGNester {
   bin: any;
@@ -36,8 +37,15 @@ export class SVGNester {
     );*/
 
     const builder = new Builder();
-    const xml = builder.buildObject(this.flatten(this.elements[0]));
-    writeFileSync("result.svg", xml, "utf8");
+    const flattened = this.flatten(this.elements[0]);
+    const xml = builder.buildObject(flattened);
+    //writeFileSync("result.json", JSON.stringify(flattened), "utf8");
+
+    const parsedSVG = svgPath(flattened.svg.path[0].$.d);
+
+    // [path, path, path, path, path]
+
+    writeFileSync("result.json", JSON.stringify(parsedSVG), "utf8");
   }
 
   flatten(element, paths?) {
@@ -74,4 +82,87 @@ export class SVGNester {
       }
     }
   }
+/*
+  splitPath(path: string) {
+    if (!path || path.tagName != 'path' || !path.parentElement) {
+      return false;
+    }
+
+    var seglist = path.pathSegList;
+    var x = 0,
+      y = 0,
+      x0 = 0,
+      y0 = 0;
+    var paths = [];
+
+    var p;
+
+    if (seglist == null) {
+      console.log('seglist = null!');
+      return;
+    }
+
+    var lastM = 0;
+    for (var i = seglist.numberOfItems - 1; i >= 0; i--) {
+      if (
+        (i > 0 && seglist.getItem(i).pathSegTypeAsLetter == 'M') ||
+        seglist.getItem(i).pathSegTypeAsLetter == 'm'
+      ) {
+        lastM = i;
+        break;
+      }
+    }
+
+    if (lastM == 0) {
+      return false; // only 1 M command, no need to split
+    }
+
+    for (i = 0; i < seglist.numberOfItems; i++) {
+      var s = seglist.getItem(i);
+      var command = s.pathSegTypeAsLetter;
+
+      if (command == 'M' || command == 'm') {
+        p = path.cloneNode();
+        p.setAttribute('d', '');
+        paths.push(p);
+      }
+
+      if (/[MLHVCSQTA]/.test(command)) {
+        if ('x' in s) x = s.x;
+        if ('y' in s) y = s.y;
+
+        p.pathSegList.appendItem(s);
+      } else {
+        if ('x' in s) x += s.x;
+        if ('y' in s) y += s.y;
+        if (command == 'm') {
+          p.pathSegList.appendItem(path.createSVGPathSegMovetoAbs(x, y));
+        } else {
+          if (command == 'Z' || command == 'z') {
+            x = x0;
+            y = y0;
+          }
+          p.pathSegList.appendItem(s);
+        }
+      }
+      // Record the start of a subpath
+      if (command == 'M' || command == 'm') {
+        (x0 = x), (y0 = y);
+      }
+    }
+
+    var addedPaths = [];
+    for (i = 0; i < paths.length; i++) {
+      // don't add trivial paths from sequential M commands
+      if (paths[i].pathSegList.numberOfItems > 1) {
+        path.parentElement.insertBefore(paths[i], path);
+        addedPaths.push(paths[i]);
+      }
+    }
+
+    path.remove();
+
+    return addedPaths;
+  }
+*/
 }

@@ -14,6 +14,7 @@
     "@types/xml2js": "^0.4.3",
     "jsdom": "^13.1.0",
     "lodash": "^4.17.11",
+    "svg-path": "^0.2.1",
     "xml2js": "^0.4.19"
   },
   "devDependencies": {
