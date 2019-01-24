@@ -81,6 +81,14 @@ export class SVGNester {
   }
 
   splitPath(input) {
+    if (input.svg == null) {
+      console.error("No SVG in splitPath");
+      return;
+    }
+    if (input.svg.path == null) {
+      console.error("No SVG.path in splitPath");
+      return;
+    }
     const element = deepCopy(input);
     let newPath = [];
     element.svg.path.forEach(path => {
@@ -89,19 +97,18 @@ export class SVGNester {
       let pathSplited = [];
       let workingOn;
       data.content.forEach(pathContent => {
-        if (pathContent.type == "M") {
-        } else if (pathContent.type == "L") {
-        }
         switch (pathContent.type) {
           case "M":
             if (workingOn != null) {
               pathSplited.push(deepCopy(workingOn));
+              workingOn = null;
             }
             workingOn = { $: path.$ };
             workingOn.$.d = `M${pathContent.x} ${pathContent.y}`;
             break;
 
           case "L":
+          case "T":
             workingOn.$.d += ` ${pathContent.type + pathContent.x} ${
               pathContent.y
             }`;
@@ -119,11 +126,42 @@ export class SVGNester {
             workingOn.$.d += ` Z`;
             break;
 
+          case "A":
+            workingOn.$.d += ` A${pathContent.rx} ${pathContent.ry} ${
+              pathContent.x_axis_rotation
+            } ${pathContent.large_arc_flag} ${pathContent.sweep_flag} ${
+              pathContent.x
+            } ${pathContent.y}`;
+            break;
+
+          case "Q":
+            workingOn.$.d += ` ${pathContent.type + pathContent.x1} ${
+              pathContent.y1
+            }, ${pathContent.x} ${pathContent.y}`;
+            break;
+
+          case "S":
+            workingOn.$.d += ` ${pathContent.type + pathContent.x2} ${
+              pathContent.y2
+            }, ${pathContent.x} ${pathContent.y}`;
+            break;
+
+          case "H":
+            workingOn.$.d += ` ${pathContent.type + pathContent.x}`;
+            break;
+
+          case "V":
+            workingOn.$.d += ` ${pathContent.type + pathContent.y}`;
+            break;
+
           default:
-            console.log(pathContent.type + " is not supported");
+            console.log(pathContent.type + " is not supported", pathContent);
             break;
         }
       });
+      if (workingOn != null) {
+        pathSplited.push(deepCopy(workingOn));
+      }
       newPath.push(pathSplited);
     });
     const newElement = element;
