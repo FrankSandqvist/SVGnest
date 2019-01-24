@@ -31,8 +31,10 @@ export class SVGNester {
     //console.log(this.bin);
 
     const builder = new Builder();
+    console.time("fatten-split");
     const flattened = this.flatten(this.elements[0]);
     const splited = this.splitPath(flattened);
+    console.timeEnd("fatten-split");
     const xml = builder.buildObject(splited);
 
     const parsedSVG = svgPath(flattened.svg.path[0].$.d);
@@ -61,7 +63,7 @@ export class SVGNester {
     }
     //If path
     if (element.path != null) {
-      console.log("Found path");
+      //console.log("Found path");
       paths.push(element.path);
     }
 
