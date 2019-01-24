@@ -84,11 +84,11 @@ export class SVGNester {
 
   splitPath(input) {
     if (input.svg == null) {
-      console.error("No SVG in splitPath");
+      console.error("No SVG!");
       return;
     }
     if (input.svg.path == null) {
-      console.error("No SVG.path in splitPath");
+      console.error("No SVG.path!");
       return;
     }
     const element = deepCopy(input);
