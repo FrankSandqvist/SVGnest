@@ -2,10 +2,26 @@ import { Parser, Builder } from "xml2js";
 import { writeFileSync } from "fs";
 import * as _ from "lodash";
 import * as svgPath from "svg-path";
+import GeometryUtil from "./util/GeometryUtil";
+//import * as ClipperLib from "./util/clipper";
+import { start } from "repl";
 
 export class SVGNester {
   bin: any;
   elements: any[];
+  parts: any;
+  svg: any;
+  config: any = {
+    clipperScale: 10000000,
+    curveTolerance: 0.3,
+    spacing: 0,
+    rotations: 4,
+    populationSize: 10,
+    mutationRate: 10,
+    useHoles: false,
+    exploreConcave: false
+  };
+  geometryUtil = new GeometryUtil(this.config);
 
   constructor(private binXML: string, private partsXML: string[]) {}
 
@@ -34,6 +50,7 @@ export class SVGNester {
     console.time("fatten-split");
     const flattened = this.flatten(this.elements[0]);
     const splited = this.splitPath(flattened);
+    this.svg = splited;
     console.timeEnd("fatten-split");
     const xml = builder.buildObject(splited);
 
@@ -45,6 +62,8 @@ export class SVGNester {
     writeFileSync("result.svg", xml, "utf8");
 
     writeFileSync("resultSVG.json", JSON.stringify(splited, null, 2), "utf8");
+
+    this.start();
   }
 
   flatten(element, paths?) {
@@ -169,6 +188,51 @@ export class SVGNester {
     const newElement = element;
     newElement.svg.path = _.flatten(newPath);
     return newElement;
+  }
+
+  start() {
+    if (!this.bin || !this.elements) return false;
+    this.parts = Array.prototype.slice.call(this.svg.svg.path);
+    let binindex = this.parts.indexOf(this.bin);
+
+    if (binindex >= 0) {
+      // don't process bin as a part of the tree
+      this.parts.splice(binindex, 1);
+    }
+
+    // build tree without bin
+    let tree = this.geometryUtil.getParts(this.parts.slice(0));
+
+    offsetTree(
+      tree,
+      0.5 * this.config.spacing,
+      this.geometryUtil.polygonOffset.bind(this)
+    );
+
+    // offset tree recursively
+    function offsetTree(t, offset, offsetFunction) {
+      for (var i = 0; i < t.length; i++) {
+        var offsetpaths = offsetFunction(t[i], offset);
+        if (offsetpaths.length == 1) {
+          // replace array items in place
+          Array.prototype.splice.apply(
+            t[i],
+            [0, t[i].length].concat(offsetpaths[0])
+          );
+        }
+
+        if (t[i].children && t[i].children.length > 0) {
+          offsetTree(t[i].children, -offset, offsetFunction);
+        }
+      }
+    }
+
+    let binPolygon = this.geometryUtil.polygonify(this.bin);
+    binPolygon = this.geometryUtil.cleanPolygon(binPolygon);
+
+    if (!binPolygon || binPolygon.length < 3) {
+      return false;
+    }
   }
 }
 
