@@ -20,7 +20,6 @@ export class SVGNester {
     useHoles: false,
     exploreConcave: false
   };
-  geometryUtil = new GeometryUtil(this.config);
 
   constructor(private binXML: string, private partsXML: string[]) {}
 
