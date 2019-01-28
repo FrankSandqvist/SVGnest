@@ -2,7 +2,6 @@ import { Parser, Builder } from "xml2js";
 import { writeFileSync } from "fs";
 import * as _ from "lodash";
 import * as svgPath from "svg-path";
-import GeometryUtil from "./util/GeometryUtil";
 //import * as ClipperLib from "./util/clipper";
 import { start } from "repl";
 
