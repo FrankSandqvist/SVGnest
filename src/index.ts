@@ -4,19 +4,29 @@ import * as _ from "lodash";
 // @ts-ignore
 import * as svgPath from "svg-path";
 
+import deepCopy from "./util/deepCopy";
+
 import * as QuadraticBezier from "./geometryutils/quadraticBezier";
 import * as CubicBezier from "./geometryutils/cubicBexier";
 import * as Arc from "./geometryutils/arc";
 import almostEqual from "./geometryutils/almostEqual";
 import polygonArea from "./geometryutils/polygonArea";
 import pointInPolygon from "./geometryutils/pointInPolygon";
+import getPolygonBounds from "./geometryutils/getPolygonBounds";
+import GeneticAlgorithm from "./util/geneticAlgorithm";
 import * as ClipperLib from "./geometryutils/clipper";
+import { Z_BINARY } from "zlib";
 
 export class SVGNester {
   bin: any;
   elements: any[];
   parts: any;
   svg: any;
+  tree: any;
+  working: boolean;
+  workerTimer: any;
+  nfpCache: any;
+  GA: any;
   config: any = {
     clipperScale: 10000000,
     curveTolerance: 0.3,
@@ -69,7 +79,9 @@ export class SVGNester {
 
     writeFileSync("resultSVG.json", JSON.stringify(splited, null, 2), "utf8");
 
-    console.log("Result:", this.getParts(splited));
+    this.tree = this.getParts(splited);
+
+    this.start();
   }
 
   flatten(element, paths?) {
@@ -196,8 +208,199 @@ export class SVGNester {
     return newElement;
   }
 
-  start() {
-    if (!this.bin || !this.elements) return false;
+  start(progressCallback?, displayCallback?) {
+    let { bin, svg, config, tree } = this;
+    if (!bin || !svg) return false;
+
+    let binPolygon: any = this.cleanPolygon(this.polygonify(this.bin));
+
+    if (!binPolygon || binPolygon.length < 3) {
+      console.log("binPoly failed!");
+      return false;
+    }
+
+    let binBounds = getPolygonBounds(binPolygon);
+
+    if (config.spacing > 0) {
+      var offsetBin = this.polygonOffset(binPolygon, -0.5 * config.spacing);
+      if (offsetBin.length == 1) {
+        // if the offset contains 0 or more than 1 path, something went wrong.
+        binPolygon = offsetBin.pop();
+      }
+    }
+
+    binPolygon.id = -1;
+
+    // put bin on origin
+    let xbinmax = binPolygon[0].x;
+    let xbinmin = binPolygon[0].x;
+    let ybinmax = binPolygon[0].y;
+    let ybinmin = binPolygon[0].y;
+
+    for (let i = 1; i < binPolygon.length; i++) {
+      if (binPolygon[i].x > xbinmax) {
+        xbinmax = binPolygon[i].x;
+      } else if (binPolygon[i].x < xbinmin) {
+        xbinmin = binPolygon[i].x;
+      }
+      if (binPolygon[i].y > ybinmax) {
+        ybinmax = binPolygon[i].y;
+      } else if (binPolygon[i].y < ybinmin) {
+        ybinmin = binPolygon[i].y;
+      }
+    }
+
+    for (let i = 0; i < binPolygon.length; i++) {
+      binPolygon[i].x -= xbinmin;
+      binPolygon[i].y -= ybinmin;
+    }
+
+    binPolygon.width = xbinmax - xbinmin;
+    binPolygon.height = ybinmax - ybinmin;
+
+    // all paths need to have the same winding direction
+    if (polygonArea(binPolygon) > 0) {
+      binPolygon.reverse();
+    }
+
+    for (let i = 0; i < tree.length; i++) {
+      var start = tree[i][0];
+      var end = tree[i][tree[i].length - 1];
+      if (
+        start == end ||
+        (almostEqual(start.x, end.x) && almostEqual(start.y, end.y))
+      ) {
+        tree[i].pop();
+      }
+
+      if (polygonArea(tree[i]) > 0) {
+        tree[i].reverse();
+      }
+    }
+
+    let self = this;
+    this.working = false;
+
+    this.workerTimer = setInterval(function() {
+      if (!self.working) {
+        self.launchWorkers.call(
+          self,
+          tree,
+          binPolygon,
+          config,
+          progressCallback,
+          displayCallback
+        );
+        self.working = true;
+      }
+
+      //progressCallback(this.progress);
+    }, 100);
+  }
+
+  launchWorkers(tree, binPolygon, config, progressCallback?, displayCallback?) {
+    let { nfpCache, GA } = this;
+    function shuffle(array) {
+      var currentIndex = array.length,
+        temporaryValue,
+        randomIndex;
+
+      // While there remain elements to shuffle...
+      while (0 !== currentIndex) {
+        // Pick a remaining element...
+        randomIndex = Math.floor(Math.random() * currentIndex);
+        currentIndex -= 1;
+
+        // And swap it with the current element.
+        temporaryValue = array[currentIndex];
+        array[currentIndex] = array[randomIndex];
+        array[randomIndex] = temporaryValue;
+      }
+
+      return array;
+    }
+
+    var i, j;
+
+    if (this.GA === null) {
+      // initiate new this.GA
+      var adam = tree.slice(0);
+
+      // seed with decreasing area
+      adam.sort(function(a, b) {
+        return Math.abs(polygonArea(b)) - Math.abs(polygonArea(a));
+      });
+
+      this.GA = new GeneticAlgorithm(adam, binPolygon, config);
+    }
+
+    console.log(new GeneticAlgorithm(adam, binPolygon, config));
+
+    var individual = null;
+
+    // evaluate all members of the population
+    for (i = 0; i < this.GA.population.length; i++) {
+      if (!this.GA.population[i].fitness) {
+        individual = this.GA.population[i];
+        break;
+      }
+    }
+
+    if (individual === null) {
+      // all individuals have been evaluated, start next generation
+      GA.generation();
+      individual = GA.population[1];
+    }
+
+    var placelist = individual.placement;
+    var rotations = individual.rotation;
+
+    var ids = [];
+    for (i = 0; i < placelist.length; i++) {
+      ids.push(placelist[i].id);
+      placelist[i].rotation = rotations[i];
+    }
+
+    var nfpPairs = [];
+    var key;
+    var newCache = {};
+
+    for (i = 0; i < placelist.length; i++) {
+      var part = placelist[i];
+      key = {
+        A: binPolygon.id,
+        B: part.id,
+        inside: true,
+        Arotation: 0,
+        Brotation: rotations[i]
+      };
+      if (!nfpCache[JSON.stringify(key)]) {
+        nfpPairs.push({ A: binPolygon, B: part, key: key });
+      } else {
+        newCache[JSON.stringify(key)] = nfpCache[JSON.stringify(key)];
+      }
+      for (j = 0; j < i; j++) {
+        var placed = placelist[j];
+        key = {
+          A: placed.id,
+          B: part.id,
+          inside: false,
+          Arotation: rotations[j],
+          Brotation: rotations[i]
+        };
+        if (!nfpCache[JSON.stringify(key)]) {
+          nfpPairs.push({ A: placed, B: part, key: key });
+        } else {
+          newCache[JSON.stringify(key)] = nfpCache[JSON.stringify(key)];
+        }
+      }
+    }
+
+    // only keep cache for one cycle
+    nfpCache = newCache;
+
+    //workers here!
+    console.warn("No Workers!");
   }
 
   getParts(path) {
@@ -205,10 +408,10 @@ export class SVGNester {
 
     let { config } = this;
 
-    var i, j;
-    var polygons = [];
+    let i, j;
+    let polygons = [];
 
-    var numChildren = paths.length;
+    let numChildren = paths.length;
     for (i = 0; i < numChildren; i++) {
       var poly = this.polygonify(paths[i]);
 
@@ -288,8 +491,10 @@ export class SVGNester {
     let poly = [];
     let i = -1;
 
-    //console.log(element);
-    let seglist = svgPath(element.$.d).content;
+    //if (element.$ == null) console.log("element: ", element.svg.path[0].$.d);
+    let seglist = svgPath(
+      element.$ != null ? element.$.d : element.svg.path[0].$.d
+    ).content;
 
     let firstCommand = seglist[0].type;
     let lastCommand = seglist[seglist.length - 1].type;
@@ -516,39 +721,34 @@ export class SVGNester {
 
     return normal;
   }
+
+  polygonOffset(polygon, offset) {
+    let { config } = this;
+    if (!offset || offset == 0 || almostEqual(offset, 0)) {
+      return polygon;
+    }
+
+    var p = this.svgToClipper(polygon);
+
+    var miterLimit = 2;
+    var co = new ClipperLib.ClipperOffset(
+      miterLimit,
+      config.curveTolerance * config.clipperScale
+    );
+    co.AddPath(
+      p,
+      ClipperLib.JoinType.jtRound,
+      ClipperLib.EndType.etClosedPolygon
+    );
+
+    var newpaths: any = new ClipperLib.Paths();
+    co.Execute(newpaths, offset * config.clipperScale);
+
+    var result = [];
+    for (var i = 0; i < newpaths.length; i++) {
+      result.push(this.clipperToSvg(newpaths[i]));
+    }
+
+    return result;
+  }
 }
-
-const deepCopy = obj => {
-  //https://stackoverflow.com/a/28152032/9125965
-  let copy;
-
-  // Handle the 3 simple types, and null or undefined
-  if (null == obj || "object" != typeof obj) return obj;
-
-  // Handle Date
-  if (obj instanceof Date) {
-    copy = new Date();
-    copy.setTime(obj.getTime());
-    return copy;
-  }
-
-  // Handle Array
-  if (obj instanceof Array) {
-    copy = [];
-    for (var i = 0, len = obj.length; i < len; i++) {
-      copy[i] = deepCopy(obj[i]);
-    }
-    return copy;
-  }
-
-  // Handle Object
-  if (obj instanceof Object) {
-    copy = {};
-    for (var attr in obj) {
-      if (obj.hasOwnProperty(attr)) copy[attr] = deepCopy(obj[attr]);
-    }
-    return copy;
-  }
-
-  throw new Error("Unable to copy obj! Its type isn't supported.");
-};
