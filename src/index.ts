@@ -8,6 +8,9 @@ import * as QuadraticBezier from "./geometryutils/quadraticBezier";
 import * as CubicBezier from "./geometryutils/cubicBexier";
 import * as Arc from "./geometryutils/arc";
 import almostEqual from "./geometryutils/almostEqual";
+import polygonArea from "./geometryutils/polygonArea";
+import pointInPolygon from "./geometryutils/pointInPolygon";
+import * as ClipperLib from "./geometryutils/clipper";
 
 export class SVGNester {
   bin: any;
@@ -22,7 +25,8 @@ export class SVGNester {
     populationSize: 10,
     mutationRate: 10,
     useHoles: false,
-    exploreConcave: false
+    exploreConcave: false,
+    tolerance: 10
   };
 
   constructor(private binXML: string, private partsXML: string[]) {}
@@ -65,7 +69,7 @@ export class SVGNester {
 
     writeFileSync("resultSVG.json", JSON.stringify(splited, null, 2), "utf8");
 
-    this.getParts(splited);
+    console.log("Result:", this.getParts(splited));
   }
 
   flatten(element, paths?) {
@@ -198,7 +202,6 @@ export class SVGNester {
 
   getParts(path) {
     const paths = path.svg.path;
-    console.log("GETPARTS");
 
     let { config } = this;
 
@@ -209,16 +212,13 @@ export class SVGNester {
     for (i = 0; i < numChildren; i++) {
       var poly = this.polygonify(paths[i]);
 
-      console.log("POLY", poly);
-    } /*
-
       poly = this.cleanPolygon(poly);
 
       // todo: warn user if poly could not be processed and is excluded from the nest
       if (
         poly &&
         poly.length > 2 &&
-        Math.abs(this.geometryUtil.polygonArea(poly)) >
+        Math.abs(polygonArea(poly)) >
           config.curveTolerance * config.curveTolerance
       ) {
         poly["source"] = i;
@@ -241,7 +241,7 @@ export class SVGNester {
           if (j == i) {
             continue;
           }
-          if (this.geometryUtil.pointInPolygon(p[0], list[j]) === true) {
+          if (pointInPolygon(p[0], list[j]) === true) {
             if (!list[j].children) {
               list[j].children = [];
             }
@@ -281,17 +281,14 @@ export class SVGNester {
     // turn the list into a tree
     toTree(polygons);
 
-    console.log("POLYGONS", polygons);
-
     return polygons;
-    */
   }
 
   polygonify(element) {
     let poly = [];
     let i = -1;
 
-    console.log(element);
+    //console.log(element);
     let seglist = svgPath(element.$.d).content;
 
     let firstCommand = seglist[0].type;
@@ -459,6 +456,65 @@ export class SVGNester {
     }
 
     return poly;
+  }
+
+  cleanPolygon(polygon) {
+    var p = this.svgToClipper(polygon);
+    // remove self-intersections and find the biggest polygon that's left
+    var simple = ClipperLib.Clipper.SimplifyPolygon(
+      p,
+      ClipperLib.PolyFillType.pftNonZero
+    );
+
+    if (!simple || simple.length == 0) {
+      return null;
+    }
+
+    var biggest = simple[0];
+    var biggestarea = Math.abs(ClipperLib.Clipper.Area(biggest));
+    for (var i = 1; i < simple.length; i++) {
+      var area = Math.abs(ClipperLib.Clipper.Area(simple[i]));
+      if (area > biggestarea) {
+        biggest = simple[i];
+        biggestarea = area;
+      }
+    }
+
+    // clean up singularities, coincident points and edges
+    var clean = ClipperLib.Clipper.CleanPolygon(
+      biggest,
+      this.config.curveTolerance * this.config.clipperScale
+    );
+
+    if (!clean || clean.length == 0) {
+      return null;
+    }
+
+    return this.clipperToSvg(clean);
+  }
+
+  svgToClipper(polygon) {
+    let clip = [];
+    for (let i = 0; i < polygon.length; i++) {
+      clip.push({ X: polygon[i].x, Y: polygon[i].y });
+    }
+
+    ClipperLib.JS.ScaleUpPath(clip, this.config.clipperScale);
+
+    return clip;
+  }
+
+  clipperToSvg(polygon) {
+    let normal = [];
+
+    for (let i = 0; i < polygon.length; i++) {
+      normal.push({
+        x: polygon[i].X / this.config.clipperScale,
+        y: polygon[i].Y / this.config.clipperScale
+      });
+    }
+
+    return normal;
   }
 }
 

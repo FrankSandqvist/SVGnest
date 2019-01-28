@@ -1,6 +1,6 @@
 const TOL = Math.pow(10, -9);
 
-const almostEqual = (a, b, tolerance) => {
+const almostEqual = (a, b, tolerance?) => {
   if (!tolerance) {
     tolerance = TOL;
   }

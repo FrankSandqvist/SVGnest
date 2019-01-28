@@ -35,11 +35,10 @@ export const linearize = (p1, p2, c1, c2, tol) => {
   ]; // list of Beziers to divide
 
   // recursion could stack overflow, loop instead
-
   while (todo.length > 0) {
     var segment = todo[0];
 
-    if (this.isFlat(segment.p1, segment.p2, segment.c1, segment.c2, tol)) {
+    if (isFlat(segment.p1, segment.p2, segment.c1, segment.c2, tol)) {
       // reached subdivision limit
       finished.push({
         x: segment.p2.x,
@@ -47,7 +46,7 @@ export const linearize = (p1, p2, c1, c2, tol) => {
       });
       todo.shift();
     } else {
-      var divided = this.subdivide(
+      var divided = subdivide(
         segment.p1,
         segment.p2,
         segment.c1,
