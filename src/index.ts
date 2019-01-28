@@ -334,7 +334,7 @@ export class SVGNester {
       this.GA = new GeneticAlgorithm(adam, binPolygon, config);
     }
 
-    console.log(new GeneticAlgorithm(adam, binPolygon, config));
+    console.log(GA);
 
     var individual = null;
 
