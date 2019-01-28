@@ -192,47 +192,6 @@ export class SVGNester {
 
   start() {
     if (!this.bin || !this.elements) return false;
-    this.parts = Array.prototype.slice.call(this.svg.svg.path);
-    let binindex = this.parts.indexOf(this.bin);
-
-    if (binindex >= 0) {
-      // don't process bin as a part of the tree
-      this.parts.splice(binindex, 1);
-    }
-
-    // build tree without bin
-    let tree = this.geometryUtil.getParts(this.parts.slice(0));
-
-    offsetTree(
-      tree,
-      0.5 * this.config.spacing,
-      this.geometryUtil.polygonOffset.bind(this)
-    );
-
-    // offset tree recursively
-    function offsetTree(t, offset, offsetFunction) {
-      for (var i = 0; i < t.length; i++) {
-        var offsetpaths = offsetFunction(t[i], offset);
-        if (offsetpaths.length == 1) {
-          // replace array items in place
-          Array.prototype.splice.apply(
-            t[i],
-            [0, t[i].length].concat(offsetpaths[0])
-          );
-        }
-
-        if (t[i].children && t[i].children.length > 0) {
-          offsetTree(t[i].children, -offset, offsetFunction);
-        }
-      }
-    }
-
-    let binPolygon = this.geometryUtil.polygonify(this.bin);
-    binPolygon = this.geometryUtil.cleanPolygon(binPolygon);
-
-    if (!binPolygon || binPolygon.length < 3) {
-      return false;
-    }
   }
 }
 
