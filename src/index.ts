@@ -1,8 +1,13 @@
 import { Parser, Builder } from "xml2js";
 import { writeFileSync } from "fs";
 import * as _ from "lodash";
+// @ts-ignore
 import * as svgPath from "svg-path";
-//import * as ClipperLib from "./util/clipper";
+
+import * as QuadraticBezier from "./geometryutils/quadraticBezier";
+import * as CubicBezier from "./geometryutils/cubicBexier";
+import * as Arc from "./geometryutils/arc";
+import almostEqual from "./geometryutils/almostEqual";
 
 export class SVGNester {
   bin: any;
@@ -60,7 +65,7 @@ export class SVGNester {
 
     writeFileSync("resultSVG.json", JSON.stringify(splited, null, 2), "utf8");
 
-    this.start();
+    this.getParts(splited);
   }
 
   flatten(element, paths?) {
@@ -189,6 +194,271 @@ export class SVGNester {
 
   start() {
     if (!this.bin || !this.elements) return false;
+  }
+
+  getParts(path) {
+    const paths = path.svg.path;
+    console.log("GETPARTS");
+
+    let { config } = this;
+
+    var i, j;
+    var polygons = [];
+
+    var numChildren = paths.length;
+    for (i = 0; i < numChildren; i++) {
+      var poly = this.polygonify(paths[i]);
+
+      console.log("POLY", poly);
+    } /*
+
+      poly = this.cleanPolygon(poly);
+
+      // todo: warn user if poly could not be processed and is excluded from the nest
+      if (
+        poly &&
+        poly.length > 2 &&
+        Math.abs(this.geometryUtil.polygonArea(poly)) >
+          config.curveTolerance * config.curveTolerance
+      ) {
+        poly["source"] = i;
+        polygons.push(poly);
+      }
+    }
+
+    const toTree = (list, idstart?) => {
+      var parents = [];
+      var i, j;
+
+      // assign a unique id to each leaf
+      var id = idstart || 0;
+
+      for (i = 0; i < list.length; i++) {
+        var p = list[i];
+
+        var ischild = false;
+        for (j = 0; j < list.length; j++) {
+          if (j == i) {
+            continue;
+          }
+          if (this.geometryUtil.pointInPolygon(p[0], list[j]) === true) {
+            if (!list[j].children) {
+              list[j].children = [];
+            }
+            list[j].children.push(p);
+            p.parent = list[j];
+            ischild = true;
+            break;
+          }
+        }
+
+        if (!ischild) {
+          parents.push(p);
+        }
+      }
+
+      for (i = 0; i < list.length; i++) {
+        if (parents.indexOf(list[i]) < 0) {
+          list.splice(i, 1);
+          i--;
+        }
+      }
+
+      for (i = 0; i < parents.length; i++) {
+        parents[i].id = id;
+        id++;
+      }
+
+      for (i = 0; i < parents.length; i++) {
+        if (parents[i].children) {
+          id = toTree(parents[i].children, id);
+        }
+      }
+
+      return id;
+    };
+
+    // turn the list into a tree
+    toTree(polygons);
+
+    console.log("POLYGONS", polygons);
+
+    return polygons;
+    */
+  }
+
+  polygonify(element) {
+    let poly = [];
+    let i = -1;
+
+    console.log(element);
+    let seglist = svgPath(element.$.d).content;
+
+    let firstCommand = seglist[0].type;
+    let lastCommand = seglist[seglist.length - 1].type;
+
+    let x = 0,
+      y = 0,
+      x0 = 0,
+      y0 = 0,
+      x1 = 0,
+      y1 = 0,
+      x2 = 0,
+      y2 = 0,
+      prevx = 0,
+      prevy = 0,
+      prevx1 = 0,
+      prevy1 = 0,
+      prevx2 = 0,
+      prevy2 = 0;
+
+    seglist.forEach(s => {
+      i++;
+      let command = s.type;
+
+      prevx = x;
+      prevy = y;
+
+      prevx1 = x1;
+      prevy1 = y1;
+
+      prevx2 = x2;
+      prevy2 = y2;
+
+      if (/[MLHVCSQTA]/.test(command)) {
+        if ("x1" in s) x1 = s.x1;
+        if ("x2" in s) x2 = s.x2;
+        if ("y1" in s) y1 = s.y1;
+        if ("y2" in s) y2 = s.y2;
+        if ("x" in s) x = s.x;
+        if ("y" in s) y = s.y;
+      } else {
+        if ("x1" in s) x1 = x + s.x1;
+        if ("x2" in s) x2 = x + s.x2;
+        if ("y1" in s) y1 = y + s.y1;
+        if ("y2" in s) y2 = y + s.y2;
+        if ("x" in s) x += s.x;
+        if ("y" in s) y += s.y;
+      }
+      switch (command) {
+        // linear line types
+        case "m":
+        case "M":
+        case "l":
+        case "L":
+        case "h":
+        case "H":
+        case "v":
+        case "V":
+          let point = { x, y };
+          point.x = x;
+          point.y = y;
+          poly.push(point);
+          break;
+        // Quadratic Beziers
+        case "t":
+        case "T":
+          // implicit control point
+          if (
+            i > 0 &&
+            /[QqTt]/.test(seglist.getItem(i - 1).pathSegTypeAsLetter)
+          ) {
+            x1 = prevx + (prevx - prevx1);
+            y1 = prevy + (prevy - prevy1);
+          } else {
+            x1 = prevx;
+            y1 = prevy;
+          }
+        case "q":
+        case "Q":
+          var pointlist = QuadraticBezier.linearize(
+            { x: prevx, y: prevy },
+            { x: x, y: y },
+            { x: x1, y: y1 },
+            this.config.tolerance
+          );
+          pointlist.shift(); // firstpoint would already be in the poly
+          for (var j = 0; j < pointlist.length; j++) {
+            let point = { x, y };
+            point.x = pointlist[j].x;
+            point.y = pointlist[j].y;
+            poly.push(point);
+          }
+          break;
+        case "s":
+        case "S":
+          if (
+            i > 0 &&
+            /[CcSs]/.test(seglist.getItem(i - 1).pathSegTypeAsLetter)
+          ) {
+            x1 = prevx + (prevx - prevx2);
+            y1 = prevy + (prevy - prevy2);
+          } else {
+            x1 = prevx;
+            y1 = prevy;
+          }
+        case "c":
+        case "C":
+          var pointlist = CubicBezier.linearize(
+            { x: prevx, y: prevy },
+            { x: x, y: y },
+            { x: x1, y: y1 },
+            { x: x2, y: y2 },
+            this.config.tolerance
+          );
+          pointlist.shift(); // firstpoint would already be in the poly
+          for (var j = 0; j < pointlist.length; j++) {
+            let point = { x, y };
+            point.x = pointlist[j].x;
+            point.y = pointlist[j].y;
+            poly.push(point);
+          }
+          break;
+        case "a":
+        case "A":
+          var pointlist = Arc.linearize(
+            { x: prevx, y: prevy },
+            { x: x, y: y },
+            s.r1,
+            s.r2,
+            s.angle,
+            s.largeArcFlag,
+            s.sweepFlag,
+            this.config.tolerance
+          );
+          pointlist.shift();
+
+          for (var j = 0; j < pointlist.length; j++) {
+            let point = { x, y };
+            point.x = pointlist[j].x;
+            point.y = pointlist[j].y;
+            poly.push(point);
+          }
+          break;
+        case "z":
+        case "Z":
+          x = x0;
+          y = y0;
+          break;
+      }
+      // Record the start of a subpath
+      if (command == "M" || command == "m") (x0 = x), (y0 = y);
+    });
+
+    // do not include last point if coincident with starting point
+    while (
+      poly.length > 0 &&
+      almostEqual(
+        poly[0].x,
+        poly[poly.length - 1].x,
+        this.config.toleranceSvg
+      ) &&
+      almostEqual(poly[0].y, poly[poly.length - 1].y, this.config.toleranceSvg)
+    ) {
+      poly.pop();
+    }
+
+    return poly;
   }
 }
 
