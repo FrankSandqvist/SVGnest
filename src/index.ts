@@ -3,7 +3,6 @@ import { writeFileSync } from "fs";
 import * as _ from "lodash";
 import * as svgPath from "svg-path";
 //import * as ClipperLib from "./util/clipper";
-import { start } from "repl";
 
 export class SVGNester {
   bin: any;
