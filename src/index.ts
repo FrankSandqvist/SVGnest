@@ -14,8 +14,8 @@ import polygonArea from "./geometryutils/polygonArea";
 import pointInPolygon from "./geometryutils/pointInPolygon";
 import getPolygonBounds from "./geometryutils/getPolygonBounds";
 import GeneticAlgorithm from "./util/geneticAlgorithm";
+import PlacementWorker from "./util/placementWorker";
 import * as ClipperLib from "./geometryutils/clipper";
-import { Z_BINARY } from "zlib";
 
 export class SVGNester {
   bin: any;
@@ -27,6 +27,7 @@ export class SVGNester {
   workerTimer: any;
   nfpCache: any;
   GA: any;
+  binBounds;
   config: any = {
     clipperScale: 10000000,
     curveTolerance: 0.3,
@@ -209,7 +210,7 @@ export class SVGNester {
   }
 
   start(progressCallback?, displayCallback?) {
-    let { bin, svg, config, tree } = this;
+    let { bin, svg, config, tree, binBounds } = this;
     if (!bin || !svg) return false;
 
     let binPolygon: any = this.cleanPolygon(this.polygonify(this.bin));
@@ -219,7 +220,7 @@ export class SVGNester {
       return false;
     }
 
-    let binBounds = getPolygonBounds(binPolygon);
+    binBounds = getPolygonBounds(binPolygon);
 
     if (config.spacing > 0) {
       var offsetBin = this.polygonOffset(binPolygon, -0.5 * config.spacing);
@@ -281,21 +282,21 @@ export class SVGNester {
     let self = this;
     this.working = false;
 
-    this.workerTimer = setInterval(function() {
-      if (!self.working) {
-        self.launchWorkers.call(
-          self,
-          tree,
-          binPolygon,
-          config,
-          progressCallback,
-          displayCallback
-        );
-        self.working = true;
-      }
+    //this.workerTimer = setInterval(function() {
+    if (!self.working) {
+      self.launchWorkers.call(
+        self,
+        tree,
+        binPolygon,
+        config,
+        progressCallback,
+        displayCallback
+      );
+      self.working = true;
+    }
 
-      //progressCallback(this.progress);
-    }, 100);
+    //progressCallback(this.progress);
+    //}, 100);
   }
 
   launchWorkers(tree, binPolygon, config, progressCallback?, displayCallback?) {
@@ -322,7 +323,7 @@ export class SVGNester {
 
     var i, j;
 
-    if (this.GA === null) {
+    if (GA == null) {
       // initiate new this.GA
       var adam = tree.slice(0);
 
@@ -331,17 +332,17 @@ export class SVGNester {
         return Math.abs(polygonArea(b)) - Math.abs(polygonArea(a));
       });
 
-      this.GA = new GeneticAlgorithm(adam, binPolygon, config);
+      GA = new GeneticAlgorithm(adam, binPolygon, config);
     }
 
-    console.log(GA);
+    //console.log(GA);
 
     var individual = null;
 
     // evaluate all members of the population
-    for (i = 0; i < this.GA.population.length; i++) {
-      if (!this.GA.population[i].fitness) {
-        individual = this.GA.population[i];
+    for (i = 0; i < GA.population.length; i++) {
+      if (!GA.population[i].fitness) {
+        individual = GA.population[i];
         break;
       }
     }
@@ -374,7 +375,7 @@ export class SVGNester {
         Arotation: 0,
         Brotation: rotations[i]
       };
-      if (!nfpCache[JSON.stringify(key)]) {
+      if (/*!nfpCache[JSON.stringify(key)]*/ true) {
         nfpPairs.push({ A: binPolygon, B: part, key: key });
       } else {
         newCache[JSON.stringify(key)] = nfpCache[JSON.stringify(key)];
@@ -388,7 +389,7 @@ export class SVGNester {
           Arotation: rotations[j],
           Brotation: rotations[i]
         };
-        if (!nfpCache[JSON.stringify(key)]) {
+        if (/*!nfpCache[JSON.stringify(key)]*/ true) {
           nfpPairs.push({ A: placed, B: part, key: key });
         } else {
           newCache[JSON.stringify(key)] = nfpCache[JSON.stringify(key)];
@@ -399,8 +400,14 @@ export class SVGNester {
     // only keep cache for one cycle
     nfpCache = newCache;
 
-    //workers here!
-    console.warn("No Workers!");
+    var worker = new PlacementWorker(
+      binPolygon,
+      placelist.slice(0),
+      ids,
+      rotations,
+      config,
+      nfpCache
+    );
   }
 
   getParts(path) {
@@ -750,5 +757,83 @@ export class SVGNester {
     }
 
     return result;
+  }
+
+  applyPlacement(placement) {
+    let { parts, svg, binBounds, bin, tree } = this;
+    var i, j, k;
+    var clone = [];
+    for (i = 0; i < parts.length; i++) {
+      clone.push(parts[i].cloneNode(false));
+    }
+
+    var svglist = [];
+
+    for (i = 0; i < placement.length; i++) {
+      var newsvg = svg.cloneNode(false);
+      newsvg.setAttribute(
+        "viewBox",
+        "0 0 " + binBounds.width + " " + binBounds.height
+      );
+      newsvg.setAttribute("width", binBounds.width + "px");
+      newsvg.setAttribute("height", binBounds.height + "px");
+      var binclone = bin.cloneNode(false);
+
+      binclone.setAttribute("class", "bin");
+      binclone.setAttribute(
+        "transform",
+        "translate(" + -binBounds.x + " " + -binBounds.y + ")"
+      );
+      newsvg.appendChild(binclone);
+
+      for (j = 0; j < placement[i].length; j++) {
+        var p = placement[i][j];
+        var part = tree[p.id];
+
+        // the original path could have transforms and stuff on it, so apply our transforms on a group
+        var partgroup = document.createElementNS(svg.namespaceURI, "g");
+        partgroup.setAttribute(
+          "transform",
+          "translate(" + p.x + " " + p.y + ") rotate(" + p.rotation + ")"
+        );
+        partgroup.appendChild(clone[part.source]);
+
+        if (part.children && part.children.length > 0) {
+          var flattened = _flattenTree(part.children, true);
+          for (k = 0; k < flattened.length; k++) {
+            var c = clone[flattened[k].source];
+            // add class to indicate hole
+            if (
+              flattened[k].hole &&
+              (!c.getAttribute("class") ||
+                c.getAttribute("class").indexOf("hole") < 0)
+            ) {
+              c.setAttribute("class", c.getAttribute("class") + " hole");
+            }
+            partgroup.appendChild(c);
+          }
+        }
+
+        newsvg.appendChild(partgroup);
+      }
+
+      svglist.push(newsvg);
+    }
+
+    // flatten the given tree into a list
+    function _flattenTree(t, hole) {
+      var flat = [];
+      for (var i = 0; i < t.length; i++) {
+        flat.push(t[i]);
+        t[i].hole = hole;
+        if (t[i].children && t[i].children.length > 0) {
+          flat = flat.concat(_flattenTree(t[i].children, !hole));
+        }
+      }
+
+      return flat;
+    }
+
+    return svglist;
   }
 }
