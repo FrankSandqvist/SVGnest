@@ -17,6 +17,8 @@ import GeneticAlgorithm from "./util/geneticAlgorithm";
 import PlacementWorker from "./util/placementWorker";
 import * as ClipperLib from "./geometryutils/clipper";
 
+import * as worker from "worker_threads";
+
 export class SVGNester {
   bin: any;
   elements: any[];
@@ -61,28 +63,37 @@ export class SVGNester {
     });
     this.elements = await Promise.all(partsParsePromises);
 
-    //console.log(this.bin);
-
     const builder = new Builder();
-    console.time("fatten-split");
+    console.time("fatten");
     const flattened = this.flatten(this.elements[0]);
+    console.timeEnd("fatten");
+    console.time("splitPath");
     const splited = this.splitPath(flattened);
+    console.timeEnd("splitPath");
     this.svg = splited;
-    console.timeEnd("fatten-split");
+
     const xml = builder.buildObject(splited);
 
     const parsedSVG = svgPath(flattened.svg.path[0].$.d);
 
     // [path, path, path, path, path]
 
-    writeFileSync("result.json", JSON.stringify(parsedSVG, null, 2), "utf8");
     writeFileSync("result.svg", xml, "utf8");
 
     writeFileSync("resultSVG.json", JSON.stringify(splited, null, 2), "utf8");
 
+    console.time("getParts");
     this.tree = this.getParts(splited);
+    console.timeEnd("getParts");
 
+    console.time("start");
     this.start();
+    console.timeEnd("start");
+    writeFileSync("result.json", JSON.stringify(this.tree, null, 2), "utf8");
+    const util = require("util");
+
+    // alternative shortcut
+    console.log(util.inspect(this.tree, false, null, true /* enable colors */));
   }
 
   flatten(element, paths?) {
