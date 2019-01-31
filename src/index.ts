@@ -89,11 +89,7 @@ export class SVGNester {
     console.time("start");
     this.start();
     console.timeEnd("start");
-    writeFileSync("result.json", JSON.stringify(this.tree, null, 2), "utf8");
-    const util = require("util");
-
-    // alternative shortcut
-    console.log(util.inspect(this.tree, false, null, true /* enable colors */));
+    writeFileSync("result.json", JSON.stringify(splited, null, 2), "utf8");
   }
 
   flatten(element, paths?) {
@@ -332,11 +328,13 @@ export class SVGNester {
       return array;
     }
 
-    var i, j;
+    let i, j;
 
     if (GA == null) {
       // initiate new this.GA
-      var adam = tree.slice(0);
+      let adam = tree.slice(0);
+
+      console.log(adam);
 
       // seed with decreasing area
       adam.sort(function(a, b) {
@@ -348,7 +346,7 @@ export class SVGNester {
 
     //console.log(GA);
 
-    var individual = null;
+    let individual = null;
 
     // evaluate all members of the population
     for (i = 0; i < GA.population.length; i++) {
@@ -364,18 +362,20 @@ export class SVGNester {
       individual = GA.population[1];
     }
 
-    var placelist = individual.placement;
-    var rotations = individual.rotation;
+    let placelist = individual.placement;
+    let rotations = individual.rotation;
 
-    var ids = [];
+    let ids = [];
     for (i = 0; i < placelist.length; i++) {
       ids.push(placelist[i].id);
       placelist[i].rotation = rotations[i];
     }
 
-    var nfpPairs = [];
-    var key;
-    var newCache = {};
+    let nfpPairs = [];
+    let key;
+    let newCache = {};
+
+    if (nfpCache == null) nfpCache = {};
 
     for (i = 0; i < placelist.length; i++) {
       var part = placelist[i];
@@ -386,13 +386,13 @@ export class SVGNester {
         Arotation: 0,
         Brotation: rotations[i]
       };
-      if (/*!nfpCache[JSON.stringify(key)]*/ true) {
+      if (!nfpCache[JSON.stringify(key)]) {
         nfpPairs.push({ A: binPolygon, B: part, key: key });
       } else {
         newCache[JSON.stringify(key)] = nfpCache[JSON.stringify(key)];
       }
       for (j = 0; j < i; j++) {
-        var placed = placelist[j];
+        let placed = placelist[j];
         key = {
           A: placed.id,
           B: part.id,
@@ -400,7 +400,7 @@ export class SVGNester {
           Arotation: rotations[j],
           Brotation: rotations[i]
         };
-        if (/*!nfpCache[JSON.stringify(key)]*/ true) {
+        if (!nfpCache[JSON.stringify(key)]) {
           nfpPairs.push({ A: placed, B: part, key: key });
         } else {
           newCache[JSON.stringify(key)] = nfpCache[JSON.stringify(key)];
@@ -411,7 +411,7 @@ export class SVGNester {
     // only keep cache for one cycle
     nfpCache = newCache;
 
-    var worker = new PlacementWorker(
+    const worker = new PlacementWorker(
       binPolygon,
       placelist.slice(0),
       ids,
