@@ -18,7 +18,6 @@ import PlacementWorker from "./util/placementWorker";
 import * as ClipperLib from "./geometryutils/clipper";
 
 import * as worker from "worker_threads";
-import { start } from "repl";
 
 export class SVGNester {
   bin: any;
@@ -64,54 +63,42 @@ export class SVGNester {
     });
     this.elements = await Promise.all(partsParsePromises);
 
-    //const element = this.elements.shift();
-    const elementSplitted = this.elements.map(e =>
-      this.splitPath(this.flatten(e))
-    );
-    const newElement = deepCopy(elementSplitted[0]);
-    newElement.svg.path = [];
-    elementSplitted.forEach(e => {
-      newElement.svg.path.push(deepCopy(e.svg.path));
-    });
-    newElement.svg.path = _.flatten(newElement.svg.path);
-    this.svg = newElement;
-
-    this.tree = this.getParts(newElement);
-
-    console.log("Starting...");
-    this.start();
-    console.log("Start copmlete!");
-
-    //console.log(newElement);
-    //writeFileSync("result.json", JSON.stringify(newElement, null, 2), "utf8");
-
-    /*const builder = new Builder();
+    const builder = new Builder();
+    /*
     console.time("fatten");
     const flattened = this.flatten(this.elements[0]);
     console.timeEnd("fatten");
     console.time("splitPath");
     const splited = this.splitPath(flattened);
     console.timeEnd("splitPath");
-    this.svg = splited;
+    this.svg = splited;*/
 
-    const xml = builder.buildObject(splited);
+    this.svg = _.flatMap(this.elements, e => {
+      const flattened = this.flatten(e);
+      return this.splitPath(flattened);
+    });
 
-    const parsedSVG = svgPath(flattened.svg.path[0].$.d);
+    console.log(this.svg);
+
+    const xml = builder.buildObject(this.svg);
+
+    //const parsedSVG = svgPath(flattened.svg.path[0].$.d);
 
     // [path, path, path, path, path]
 
     writeFileSync("result.svg", xml, "utf8");
 
-    writeFileSync("resultSVG.json", JSON.stringify(splited, null, 2), "utf8");
+    writeFileSync("resultSVG.json", JSON.stringify(this.svg, null, 2), "utf8");
 
     console.time("getParts");
-    this.tree = this.getParts(splited);
+    this.tree = this.svg.map(s => this.getParts(s));
+    console.log(this.tree);
     console.timeEnd("getParts");
 
     console.time("start");
     this.start();
     console.timeEnd("start");
-    writeFileSync("result.json", JSON.stringify(splited, null, 2), "utf8");*/
+    writeFileSync("result.json", JSON.stringify(this.svg, null, 2), "utf8");
   }
 
   flatten(element, paths?) {
@@ -356,7 +343,7 @@ export class SVGNester {
       // initiate new this.GA
       let adam = tree.slice(0);
 
-      //console.log(adam);
+      console.log(tree);
 
       // seed with decreasing area
       adam.sort(function(a, b) {
@@ -441,6 +428,10 @@ export class SVGNester {
       config,
       nfpCache
     );
+
+    console.log(placelist);
+
+    // console.log(placelist.map(pl => worker.placePaths(pl)));
   }
 
   getParts(path) {

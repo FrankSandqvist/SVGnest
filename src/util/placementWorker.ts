@@ -4,6 +4,7 @@ import almostEqual from "../geometryutils/almostEqual";
 import * as ClipperLib from "../geometryutils/clipper";
 
 function PlacementWorker(binPolygon, paths, ids, rotations, config, nfpCache) {
+  //console.log("hej");
   this.binPolygon = binPolygon;
   this.paths = paths;
   this.ids = ids;

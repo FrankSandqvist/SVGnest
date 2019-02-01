@@ -6,8 +6,8 @@ const binXML = readFileSync("./testfiles/bin.svg", "utf-8");
   readFileSync(`./testfiles/${name}.svg`, 'utf8')
 );*/
 
-const partsXML = ["grouptest"].map(name =>
-  readFileSync(`./testfiles/${name}.svg`, "utf8")
+const partsXML = ["grouptest", "star", "star", "star", "star", "circ1"].map(
+  name => readFileSync(`./testfiles/${name}.svg`, "utf8")
 );
 
 const svgNester = new SVGNester(binXML, partsXML);
