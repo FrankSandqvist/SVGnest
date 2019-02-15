@@ -1,6 +1,8 @@
 import { Matrix, MatrixData } from './matrix';
-import { Element } from '../node_modules/xml-js/types/index';
-import { encodeSVGPath, SVGPathData } from '../node_modules/svg-pathdata/index';
+//import { Element } from '../node_modules/xml-js/types/index';
+//import { encodeSVGPath, SVGPathData } from '../node_modules/svg-pathdata/index';
+import { Element } from 'xml-js';
+import { encodeSVGPath, SVGPathData } from 'svg-pathdata';
 import {
   quadraticBezierLinearize,
   Point,
@@ -8,10 +10,29 @@ import {
   arcLinearize,
   almostEqual
 } from './geometry-utils';
-//import { Element } from 'xml-js';
+import { flatMap } from 'lodash';
 //import { encodeSVGPath, SVGPathData } from 'svg-pathdata';
 
-export const applyTransform = ({
+export const cleanInput = (element: Element) => {
+  element.elements.forEach((e, i) => {
+    applyTransform({
+      element: e,
+      parentArrayPos: i
+    });
+  });
+
+  flatten(element);
+
+  element.elements = element.elements.filter(el =>
+    ['svg', 'circle', 'ellipse', 'path', 'polygon', 'polyline', 'rect'].some(ae => ae === el.name)
+  );
+
+  do {
+    element.elements = flatMap(element.elements, el => splitPaths(el));
+  } while (element.elements.find(el => Array.isArray(el)));
+};
+
+const applyTransform = ({
   element,
   parentArrayPos,
   globalTransform
@@ -20,7 +41,6 @@ export const applyTransform = ({
   parentArrayPos: number;
   globalTransform?: any;
 }) => {
-  console.log(parentArrayPos, element.name);
   let transformString = (element.attributes && (element.attributes.transform as string)) || '';
   transformString = globalTransform + transformString;
 
@@ -148,7 +168,46 @@ export const applyTransform = ({
   element['parent'].elements[parentArrayPos] = element;
 };
 
-export const transformParse = (transformString: string): Matrix => {
+const flatten = (element: Element) => {
+  if ('elements' in element) {
+    element.elements.forEach(flatten);
+    if (element.name !== 'svg' && element['parent']) {
+      element['parent'].elements = element['parent'].elements.concat(element.elements);
+      element.elements = undefined;
+    }
+  }
+};
+
+const splitPaths = (path: Element): Element | Element[] => {
+  if (!path || path.name !== 'path') {
+    return path;
+  }
+
+  const seglist = new SVGPathData(path.attributes.d as string);
+
+  if (seglist.commands.findIndex(com => com.type === SVGPathData.MOVE_TO) === 0) {
+    return path;
+  }
+
+  // paths are made absolute, no need to think about relative paths.
+
+  const subPaths = [] as Element[];
+  let lastIndex = 0;
+  seglist.commands.forEach((com, index) => {
+    if (index !== 0 && com.type === SVGPathData.MOVE_TO) {
+      subPaths.push({
+        ...path,
+        attributes: {
+          ...path.attributes,
+          d: encodeSVGPath(seglist.commands.slice(lastIndex, index))
+        }
+      });
+    }
+  });
+  return subPaths;
+};
+
+const transformParse = (transformString: string): Matrix => {
   const operations = {
     matrix: true,
     scale: true,
@@ -233,7 +292,7 @@ export const transformParse = (transformString: string): Matrix => {
   return matrix;
 };
 
-export const pathToAbsolute = (path: Element): Element => {
+const pathToAbsolute = (path: Element): Element => {
   if (!path || path.name != 'path') {
     throw Error('invalid path');
   }
@@ -417,9 +476,10 @@ const transformPath = (path: Element, scale: number, rotate: number, transform: 
 };
 
 export const polygonify = (element: Element, tolerance: number) => {
-  let poly: Point[];
+  let poly: Point[] = [];
+  console.log(element);
 
-  switch (element.type) {
+  switch (element.name) {
     case 'polygon':
     case 'polyline': {
       poly = (element.attributes.points as string).split(' ').map(p => {
@@ -487,6 +547,7 @@ export const polygonify = (element: Element, tolerance: number) => {
       const firstCommand = seglist.commands[0];
       const lastCommand = seglist.commands[seglist.commands.length - 1];
 
+      console.log(seglist);
       let x = 0,
         y = 0,
         x0 = 0,
@@ -502,7 +563,7 @@ export const polygonify = (element: Element, tolerance: number) => {
         prevx2 = 0,
         prevy2 = 0;
 
-      return seglist.commands.flatMap((com, index) => {
+      poly = flatMap(seglist.commands, (com, index: number) => {
         prevx = x;
         prevy = y;
         prevx1 = x1;

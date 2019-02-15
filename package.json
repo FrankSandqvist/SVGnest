@@ -10,8 +10,9 @@
   "license": "ISC",
   "dependencies": {
     "@types/jsdom": "^12.2.1",
-    "@types/lodash": "^4.14.120",
+    "@types/lodash": "^4.14.121",
     "@types/xml2js": "^0.4.3",
+    "clipper-lib": "^6.2.1",
     "lodash": "^4.17.11",
     "svg-pathdata": "^5.0.2",
     "svgpath": "^2.2.1",

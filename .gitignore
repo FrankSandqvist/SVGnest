@@ -1,7 +1,2 @@
 node_modules
-orgFiles
-test.svg
-result.json
-resultSVG.json
-result.svg
-.jshintignore
+SVGnest-master

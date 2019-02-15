@@ -1,6 +1,6 @@
 {
-  "compilerOptions": {
-    "target": "ES2017",
-    "lib": ["esnext.array", "es7", "es2016"]
-  }
+    "compilerOptions": {
+        "target": "es2017",
+        "rootDir": "./src"
+    }
 }

@@ -1,100 +1,169 @@
 import { writeFileSync } from 'fs';
-import { Element, xml2js, js2xml } from '../node_modules/xml-js/types/index';
-//import { Element, xml2js, js2xml } from 'xml-js';
-import { applyTransform, polygonify } from './parsing';
-
+//import { Element, xml2js, js2xml } from '../node_modules/xml-js/types/index';
+import { Element, xml2js, js2xml } from 'xml-js';
+import { polygonify, cleanInput } from './parsing';
+//import * as clipper from '../node_modules/clipper-lib/clipper';
+import * as clipper from 'clipper-lib';
+import { Point, polygonArea, pointInPolygon, almostEqual } from './geometry-utils';
+import { ClipperPoint } from './clipper-types';
+//import { ClipperPoint } from './clipper-types';
 
 const parserSettings = {
   compact: false,
   alwaysArray: true,
   alwaysChildren: true,
-  addParent: true
+  addParent: true,
+  ignoreDeclaration: true
 };
 
+const standardConfig = {
+  clipperScale: 10000000,
+  curveTolerance: 0.3,
+  spacing: 0,
+  rotations: 4,
+  populationSize: 10,
+  mutationRate: 10,
+  useHoles: false,
+  exploreConcave: false
+};
+
+interface TreeNode {
+  source: number;
+  poly: Point[];
+  id?: number;
+  children?: TreeNode[];
+  parent?: TreeNode;
+}
+
 export class SVGNester {
-  constructor(private binSVG: string, private partsSVG: string[], private tolerance = Math.pow(10,-9)) {}
+  constructor(
+    private binSVG: string,
+    private partsSVG: string[],
+    config: { [P in keyof typeof standardConfig]?: typeof standardConfig[P] }
+  ) {
+    this.config = {
+      ...this.config,
+      ...config
+    };
+  }
+
   private binJSVG: Element;
   private partsJSVG: Element[];
 
+  private config: typeof standardConfig;
+
+  private tree: TreeNode[] = [];
+
   async parseSVG() {
-    this.binJSVG = xml2js(this.binSVG, parserSettings) as Element;
+    this.binJSVG = xml2js(this.binSVG, parserSettings).elements[0] as Element;
 
     this.partsJSVG = (await Promise.all(
-      this.partsSVG.map(svg => xml2js(svg, parserSettings))
+      this.partsSVG.map(svg => xml2js(svg, parserSettings).elements[0])
     )) as Element[];
 
-    this.binJSVG.elements.forEach((e, i) => {
-      applyTransform({
-        element: e,
-        parentArrayPos: i
-      });
-    });
+    cleanInput(this.binJSVG);
 
-    this.partsJSVG.forEach(jsvg =>
-      jsvg.elements.forEach((e, i) => {
-        applyTransform({
-          element: e,
-          parentArrayPos: i
-        });
-      })
-    );
+    this.partsJSVG.forEach(jsvg => {
+      cleanInput(jsvg);
+    });
+  }
+
+  start() {
+    this.tree = getParts(this.partsJSVG, this.config.curveTolerance, this.config.clipperScale);
   }
 
   test() {
-    console.log(this.binJSVG);
-
     writeFileSync(__dirname + '/test.svg', js2xml(this.binJSVG));
   }
 }
 
-const getParts = (elements: Element[]) => {
-  const polygons = [];
+const polygonToClipperPolygon = (polygon: Point[]) => {
+  return polygon.map(p => ({ X: p.x, Y: p.y }));
+};
 
-  elements.forEach(element => {
-    var poly = polygonify(paths[i], this.tolerance);
-    poly = this.cleanPolygon(poly);
+const clipperPolygonToPolygon = (polygon: ClipperPoint[]) => {
+  return polygon.map(p => ({ x: p.Y, y: p.Y }));
+};
 
-    // todo: warn user if poly could not be processed and is excluded from the nest
-    if (
-      poly &&
-      poly.length > 2 &&
-      Math.abs(polygonArea(poly)) > config.curveTolerance * config.curveTolerance
-    ) {
-      poly.source = i;
-      polygons.push(poly);
-    }
+const svgToClipper = (polygon: Point[], clipperScale: number) => {
+  const clip = polygonToClipperPolygon(polygon);
+
+  clipper.JS.ScaleUpPath(clip, clipperScale);
+
+  return clip;
+};
+
+const cleanPolygon = (polygon: Point[], curveTolerance: number, clipperScale: number) => {
+  const p = svgToClipper(polygon, clipperScale);
+  // remove self-intersections and find the biggest polygon that's left
+  const simple: ClipperPoint[] = clipper.Clipper.SimplifyPolygon(
+    p,
+    clipper.PolyFillType.pftNonZero
+  );
+
+  if (!simple || simple.length == 0) {
+    return null;
   }
 
-  // turn the list into a tree
-  toTree(polygons);
+  let biggest = simple[0];
+  let biggestarea = Math.abs(clipper.Clipper.Area(biggest));
+  simple.forEach(p => {
+    const area = Math.abs(clipper.Clipper.Area(p));
+    if (area > biggestarea) {
+      biggest = p;
+      biggestarea = area;
+    }
+  });
 
-  function toTree(list, idstart) {
-    var parents = [];
-    var i, j;
+  // clean up singularities, coincident points and edges
+  const clean = clipper.Clipper.CleanPolygon(biggest, curveTolerance * clipperScale);
+  if (!clean || clean.length == 0) {
+    return null;
+  }
+  return clipperPolygonToPolygon(clean);
+};
+
+const getParts = (elements: Element[], curveTolerance: number, clipperScale: number) => {
+  const polygons = elements.map((element, i) => {
+    const p = polygonify(element, 2);
+    const poly = cleanPolygon(p, curveTolerance, clipperScale);
+
+    // todo: warn user if poly could not be processed and is excluded from the nest
+    if (poly && poly.length > 2 && Math.abs(polygonArea(poly)) > curveTolerance * curveTolerance) {
+      return {
+        source: i,
+        poly
+      };
+    }
+  });
+
+  const toTree = (list: TreeNode[], idstart?: number) => {
+    const parents = [] as TreeNode[];
+    let i, j;
 
     // assign a unique id to each leaf
-    var id = idstart || 0;
+    let id = idstart || 0;
 
     for (i = 0; i < list.length; i++) {
-      var p = list[i];
+      let p = list[i];
 
-      var ischild = false;
+      let isChild = false;
       for (j = 0; j < list.length; j++) {
         if (j == i) {
           continue;
         }
-        if (GeometryUtil.pointInPolygon(p[0], list[j]) === true) {
+        if (pointInPolygon(p.poly[0], list[j].poly) === true) {
           if (!list[j].children) {
-            list[j].children = [];
+            list[j].children = [] as TreeNode[];
           }
           list[j].children.push(p);
           p.parent = list[j];
-          ischild = true;
+          isChild = true;
           break;
         }
       }
 
-      if (!ischild) {
+      if (!isChild) {
         parents.push(p);
       }
     }
@@ -118,7 +187,10 @@ const getParts = (elements: Element[]) => {
     }
 
     return id;
-  }
+  };
+
+  // turn the list into a tree
+  toTree(polygons);
 
   return polygons;
 };
