@@ -1,24 +1,10 @@
 import { Point } from "./geometry-utils";
 
 
-function PlacementWorker(binPolygon, paths, ids, rotations, config, nfpCache){
-	this.binPolygon = binPolygon;
-	this.paths = paths;
-	this.ids = ids;
-	this.rotations = rotations;
-	this.config = config;
-	this.nfpCache = nfpCache || {};
+export default (binPolygon: Point[], paths, ids, rotations, config, nfpCache) => {
+	const nfpCache = nfpCache || {};
 	
-	// return a placement for the paths/rotations given
-	// happens inside a webworker
-	this.placePaths = function(paths){
-
-		var self = global.env.self;
-
-		if(!self.binPolygon){
-			return null;
-		}		
-		
+	const placePaths = (paths) => {
 		var i, j, k, m, n, path;
 		
 		// rotate paths by given rotation
