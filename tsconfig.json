@@ -1,6 +1,8 @@
 {
     "compilerOptions": {
         "target": "es2017",
-        "rootDir": "./src"
+        "rootDir": "./src",
+        "lib": ["esnext"],
+        "moduleResolution": "node"
     }
 }

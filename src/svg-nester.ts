@@ -1,10 +1,16 @@
-import { writeFileSync } from 'fs';
+import { writeFileSync, writeFile } from 'fs';
 //import { Element, xml2js, js2xml } from '../node_modules/xml-js/types/index';
 import { Element, xml2js, js2xml } from 'xml-js';
 import { polygonify, cleanInput } from './parsing';
 //import * as clipper from '../node_modules/clipper-lib/clipper';
 import * as clipper from 'clipper-lib';
-import { Point, polygonArea, pointInPolygon, almostEqual } from './geometry-utils';
+import {
+  Point,
+  polygonArea,
+  pointInPolygon,
+  almostEqual,
+  getPolygonBounds
+} from './geometry-utils';
 import { ClipperPoint } from './clipper-types';
 //import { ClipperPoint } from './clipper-types';
 
@@ -27,12 +33,14 @@ const standardConfig = {
   exploreConcave: false
 };
 
-interface TreeNode {
-  source: number;
+export interface TreeNode {
+  source?: number;
   poly: Point[];
   id?: number;
   children?: TreeNode[];
   parent?: TreeNode;
+  width?: number;
+  height?: number;
 }
 
 export class SVGNester {
@@ -42,7 +50,7 @@ export class SVGNester {
     config: { [P in keyof typeof standardConfig]?: typeof standardConfig[P] }
   ) {
     this.config = {
-      ...this.config,
+      ...standardConfig,
       ...config
     };
   }
@@ -53,23 +61,118 @@ export class SVGNester {
   private config: typeof standardConfig;
 
   private tree: TreeNode[] = [];
+  private binPolygon: TreeNode;
 
   async parseSVG() {
-    this.binJSVG = xml2js(this.binSVG, parserSettings).elements[0] as Element;
+    const binJSVG = xml2js(this.binSVG, parserSettings).elements[0] as Element;
 
-    this.partsJSVG = (await Promise.all(
+    const partsJSVG = (await Promise.all(
       this.partsSVG.map(svg => xml2js(svg, parserSettings).elements[0])
     )) as Element[];
 
-    cleanInput(this.binJSVG);
-
-    this.partsJSVG.forEach(jsvg => {
-      cleanInput(jsvg);
-    });
+    this.binJSVG = cleanInput(binJSVG)[0];
+    this.partsJSVG = partsJSVG.flatMap(jsvg => cleanInput(jsvg));
   }
 
   start() {
     this.tree = getParts(this.partsJSVG, this.config.curveTolerance, this.config.clipperScale);
+
+    const offsetTree = (tree: TreeNode[], offset: number) => {
+      for (let i = 0; i < tree.length; i++) {
+        const offsetPolygon = polygonOffset(
+          tree[i].poly,
+          offset,
+          this.config.curveTolerance,
+          this.config.clipperScale
+        );
+        if (offsetPolygon.length == 1) {
+          // replace array items in place
+          Array.prototype.splice.apply(
+            tree[i].poly,
+            [0, tree[i].poly.length].concat(offsetPolygon[0])
+          );
+        }
+
+        if (tree[i].children && tree[i].children.length > 0) {
+          offsetTree(tree[i].children, -offset);
+        }
+      }
+    };
+
+    offsetTree(this.tree, 0.5 * this.config.spacing);
+    this.binPolygon = {
+      poly: cleanPolygon(
+        polygonify(this.binJSVG, this.config.curveTolerance),
+        this.config.curveTolerance,
+        this.config.clipperScale
+      )
+    };
+
+    if (!this.binPolygon || this.binPolygon.poly.length < 3) {
+      throw new Error('Invalid bin');
+    }
+
+    const binBounds = getPolygonBounds(this.binPolygon.poly);
+
+    if (this.config.spacing > 0) {
+      const offsetBin = polygonOffset(
+        this.binPolygon.poly,
+        -0.5 * this.config.spacing,
+        this.config.curveTolerance,
+        this.config.clipperScale
+      );
+      if (offsetBin.length == 1) {
+        // if the offset contains 0 or more than 1 path, something went wrong.
+        this.binPolygon = offsetBin.pop();
+      }
+    }
+
+    this.binPolygon.id = -1;
+
+    // put bin on origin
+    var xbinmax = this.binPolygon.poly[0].x;
+    var xbinmin = this.binPolygon.poly[0].x;
+    var ybinmax = this.binPolygon.poly[0].y;
+    var ybinmin = this.binPolygon.poly[0].y;
+
+    for (var i = 1; i < this.binPolygon.poly.length; i++) {
+      if (this.binPolygon.poly[i].x > xbinmax) {
+        xbinmax = this.binPolygon.poly[i].x;
+      } else if (this.binPolygon.poly[i].x < xbinmin) {
+        xbinmin = this.binPolygon.poly[i].x;
+      }
+      if (this.binPolygon.poly[i].y > ybinmax) {
+        ybinmax = this.binPolygon.poly[i].y;
+      } else if (this.binPolygon.poly[i].y < ybinmin) {
+        ybinmin = this.binPolygon.poly[i].y;
+      }
+    }
+
+    for (i = 0; i < this.binPolygon.poly.length; i++) {
+      this.binPolygon.poly[i].x -= xbinmin;
+      this.binPolygon.poly[i].y -= ybinmin;
+    }
+
+    this.binPolygon.width = xbinmax - xbinmin;
+    this.binPolygon.height = ybinmax - ybinmin;
+
+    // all paths need to have the same winding direction
+    if (polygonArea(this.binPolygon.poly) > 0) {
+      this.binPolygon.poly.reverse();
+    }
+
+    // remove duplicate endpoints, ensure counterclockwise winding direction
+    for (i = 0; i < this.tree.length; i++) {
+      const start = this.tree[i].poly[0];
+      const end = this.tree[i].poly[this.tree[i].poly.length - 1];
+      if (start === end || (almostEqual(start.x, end.x) && almostEqual(start.y, end.y))) {
+        this.tree[i].poly.pop();
+      }
+
+      if (polygonArea(this.tree[i].poly) > 0) {
+        this.tree[i].poly.reverse();
+      }
+    }
   }
 
   test() {
@@ -91,6 +194,13 @@ const svgToClipper = (polygon: Point[], clipperScale: number) => {
   clipper.JS.ScaleUpPath(clip, clipperScale);
 
   return clip;
+};
+
+const clipperToSVG = (polygon: ClipperPoint[], clipperScale: number) => {
+  return polygon.map(polygon => ({
+    x: polygon.X / clipperScale,
+    y: polygon.Y / clipperScale
+  }));
 };
 
 const cleanPolygon = (polygon: Point[], curveTolerance: number, clipperScale: number) => {
@@ -124,27 +234,35 @@ const cleanPolygon = (polygon: Point[], curveTolerance: number, clipperScale: nu
 };
 
 const getParts = (elements: Element[], curveTolerance: number, clipperScale: number) => {
-  const polygons = elements.map((element, i) => {
-    const p = polygonify(element, 2);
-    const poly = cleanPolygon(p, curveTolerance, clipperScale);
+  const polygons = elements
+    .map((element, i) => {
+      const p = polygonify(element, 2);
+      const poly = cleanPolygon(p, curveTolerance, clipperScale);
 
-    // todo: warn user if poly could not be processed and is excluded from the nest
-    if (poly && poly.length > 2 && Math.abs(polygonArea(poly)) > curveTolerance * curveTolerance) {
-      return {
-        source: i,
-        poly
-      };
-    }
-  });
+      // todo: warn user if poly could not be processed and is excluded from the nest
+      if (
+        poly &&
+        poly.length > 2 &&
+        Math.abs(polygonArea(poly)) > curveTolerance * curveTolerance
+      ) {
+        return {
+          source: i,
+          poly
+        };
+      }
+    })
+    .filter(p => p !== undefined);
+
+  writeFileSync(__dirname + '/test.jsvg', JSON.stringify(polygons));
 
   const toTree = (list: TreeNode[], idstart?: number) => {
     const parents = [] as TreeNode[];
-    let i, j;
 
     // assign a unique id to each leaf
     let id = idstart || 0;
 
-    for (i = 0; i < list.length; i++) {
+    let i: number, j: number;
+    for (let i = 0; i < list.length; i++) {
       let p = list[i];
 
       let isChild = false;
@@ -193,6 +311,23 @@ const getParts = (elements: Element[], curveTolerance: number, clipperScale: num
   toTree(polygons);
 
   return polygons;
+};
+
+const polygonOffset = (polygon: Point[], offset: number, curveTolerance, clipperScale) => {
+  if (!offset || offset === 0 || almostEqual(offset, 0)) {
+    return polygon;
+  }
+
+  const clipPolygon = svgToClipper(polygon, clipperScale);
+
+  const miterLimit = 2;
+  const co = new clipper.ClipperOffset(miterLimit, curveTolerance * clipperScale);
+  co.AddPath(clipPolygon, clipper.JoinType.jtRound, clipper.EndType.etClosedPolygon);
+
+  const newPaths = new clipper.Paths();
+  co.Execute(newPaths, offset * clipperScale);
+
+  return newPaths.map(p => clipperToSVG(p, clipperScale));
 };
 
 export interface JSVGNode {

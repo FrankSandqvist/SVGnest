@@ -10,10 +10,9 @@ import {
   arcLinearize,
   almostEqual
 } from './geometry-utils';
-import { flatMap } from 'lodash';
 //import { encodeSVGPath, SVGPathData } from 'svg-pathdata';
 
-export const cleanInput = (element: Element) => {
+export const cleanInput = (element: Element): Element[] => {
   element.elements.forEach((e, i) => {
     applyTransform({
       element: e,
@@ -27,9 +26,9 @@ export const cleanInput = (element: Element) => {
     ['svg', 'circle', 'ellipse', 'path', 'polygon', 'polyline', 'rect'].some(ae => ae === el.name)
   );
 
-  do {
-    element.elements = flatMap(element.elements, el => splitPaths(el));
-  } while (element.elements.find(el => Array.isArray(el)));
+  element.elements = element.elements.flatMap(el => splitPaths(el));
+
+  return element.elements;
 };
 
 const applyTransform = ({
@@ -185,13 +184,14 @@ const splitPaths = (path: Element): Element | Element[] => {
 
   const seglist = new SVGPathData(path.attributes.d as string);
 
-  if (seglist.commands.findIndex(com => com.type === SVGPathData.MOVE_TO) === 0) {
+  if (seglist.commands.filter(com => com.type === SVGPathData.MOVE_TO).length === 1) {
     return path;
   }
 
   // paths are made absolute, no need to think about relative paths.
 
   const subPaths = [] as Element[];
+
   let lastIndex = 0;
   seglist.commands.forEach((com, index) => {
     if (index !== 0 && com.type === SVGPathData.MOVE_TO) {
@@ -202,6 +202,14 @@ const splitPaths = (path: Element): Element | Element[] => {
           d: encodeSVGPath(seglist.commands.slice(lastIndex, index))
         }
       });
+      lastIndex = index;
+    }
+  });
+  subPaths.push({
+    ...path,
+    attributes: {
+      ...path.attributes,
+      d: encodeSVGPath(seglist.commands.slice(lastIndex, seglist.commands.length))
     }
   });
   return subPaths;
@@ -477,7 +485,6 @@ const transformPath = (path: Element, scale: number, rotate: number, transform: 
 
 export const polygonify = (element: Element, tolerance: number) => {
   let poly: Point[] = [];
-  console.log(element);
 
   switch (element.name) {
     case 'polygon':
@@ -544,10 +551,6 @@ export const polygonify = (element: Element, tolerance: number) => {
       // we'll assume that splitpath has already been run on this path, and it only has one M/m command
       const seglist = new SVGPathData(element.attributes.d as string);
 
-      const firstCommand = seglist.commands[0];
-      const lastCommand = seglist.commands[seglist.commands.length - 1];
-
-      console.log(seglist);
       let x = 0,
         y = 0,
         x0 = 0,
@@ -559,17 +562,13 @@ export const polygonify = (element: Element, tolerance: number) => {
         prevx = 0,
         prevy = 0,
         prevx1 = 0,
-        prevy1 = 0,
-        prevx2 = 0,
-        prevy2 = 0;
+        prevy1 = 0;
 
-      poly = flatMap(seglist.commands, (com, index: number) => {
+      poly = seglist.commands.flatMap((com, index) => {
         prevx = x;
         prevy = y;
         prevx1 = x1;
         prevy1 = y1;
-        prevx2 = x2;
-        prevy2 = y2;
 
         if (com['relative'] === false) {
           if ('x1' in com) x1 = com.x1;
@@ -665,9 +664,10 @@ export const polygonify = (element: Element, tolerance: number) => {
             return pointlist;
           }
           case SVGPathData.CLOSE_PATH: {
-            x = x0;
-            y = y0;
-            break;
+            return {
+              x: x0,
+              y: y0
+            }
           }
         }
       });
@@ -677,8 +677,8 @@ export const polygonify = (element: Element, tolerance: number) => {
   // do not include last point if coincident with starting point
   while (
     poly.length > 0 &&
-    almostEqual(poly[0].x, poly[poly.length - 1].x, this.conf.toleranceSvg) &&
-    almostEqual(poly[0].y, poly[poly.length - 1].y, this.conf.toleranceSvg)
+    almostEqual(poly[0].x, poly[poly.length - 1].x, tolerance) &&
+    almostEqual(poly[0].y, poly[poly.length - 1].y, tolerance)
   ) {
     poly.pop();
   }

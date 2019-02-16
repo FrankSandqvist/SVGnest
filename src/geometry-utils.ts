@@ -1,8 +1,16 @@
-const TOL = Math.pow(10, -9);
+const TOL = 0.3;
 
 export interface Point {
   x: number;
   y: number;
+}
+
+export interface Polygon {
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+  poly: Point[];
 }
 
 export const quadraticBezierIsFlat = (p1: Point, p2: Point, c1: Point, tol: number) => {
@@ -519,5 +527,25 @@ export const normalizeVector = (v: Point) => {
   return {
     x: v.x * inverse,
     y: v.y * inverse
+  };
+};
+
+export const rotatePolygon = (polygon: Point[], angle: number) => {
+  const rotatedPoly = [];
+  angle = (angle * Math.PI) / 180;
+  for (let i = 0; i < polygon.length; i++) {
+    const x = polygon[i].x;
+    const y = polygon[i].y;
+
+    rotatedPoly.push({
+      x: x * Math.cos(angle) - y * Math.sin(angle),
+      y: x * Math.sin(angle) + y * Math.cos(angle)
+    });
+  }
+  // reset bounding box
+  const bounds = getPolygonBounds(rotatedPoly);
+  return {
+    ...bounds,
+    poly: rotatePolygon
   };
 };
