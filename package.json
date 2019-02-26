@@ -1,6 +1,6 @@
 {
-  "name": "@smidyo/smidyo-nodelib-svg-nesting",
-  "version": "1.0.0",
+  "name": "svg-nest",
+  "version": "0.0.1",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -9,7 +9,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@types/jsdom": "^12.2.1",
     "@types/xml2js": "^0.4.3",
     "array.prototype.flatmap": "^1.2.1",
     "clipper-lib": "^6.2.1",
