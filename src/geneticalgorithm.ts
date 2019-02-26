@@ -1,4 +1,4 @@
-import { getPolygonBounds, Point, rotatePolygon, Polygon } from './geometry-utils';
+import { getPolygonBounds, Point, rotatePolygon } from './geometry-utils';
 import { TreeNode } from './svg-nester';
 
 const defaultConfig = { populationSize: 10, mutationRate: 10, rotations: 4 };

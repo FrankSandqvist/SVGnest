@@ -1,8 +1,20 @@
 import { TreeNode } from './svg-nester';
 import { GeneticAlgorithm } from './geneticalgorithm';
-import { polygonArea, Point } from './geometry-utils';
+import { polygonArea, Point, Polygon } from './geometry-utils';
 
-interface Key { a: number, b: number, inside: boolean, aRotation: number, bRotation: number }
+interface NFPPair {
+  a: TreeNode;
+  b: TreeNode;
+  key: Key;
+}
+
+interface Key {
+  a: number;
+  b: number;
+  inside: boolean;
+  aRotation: number;
+  bRotation: number;
+}
 
 this.launchWorkers = function({
   tree,
@@ -41,7 +53,7 @@ this.launchWorkers = function({
     return Math.abs(polygonArea(b.poly)) - Math.abs(polygonArea(a.poly));
   });
 
-  const GA = new GeneticAlgorithm({adam, binPolygon: binPolygon.poly});
+  const GA = new GeneticAlgorithm({ adam, binPolygon: binPolygon.poly });
 
   let individual = GA.population.find(ga => !ga.fitness);
 
@@ -51,13 +63,12 @@ this.launchWorkers = function({
     individual = GA.population[1];
   }
 
-  let placelist = individual.placement;
   let rotations = individual.rotation;
 
-  let ids = placelist.map(pl => pl.id);
-  placelist = placelist.map((pl, i) => ({...pl, rotation: rotations[i]}))
+  let ids = individual.placement.map(pl => pl.id);
+  let placelist = individual.placement.map((pl, i) => ({ ...pl, rotation: rotations[i] }));
 
-  let nfpPairs: Array<{a: TreeNode, b: TreeNode, key: Key}> = [];
+  let nfpPairs: NFPPair[];
   let nfpCache = {};
   let newCache = {};
   let key: Key;
