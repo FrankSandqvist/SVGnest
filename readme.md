@@ -2,7 +2,7 @@ An early attempt at porting Jack000's SVGNest into a Typescript NodeJS library.
 
 Unfortunately, I'm not too familiar with the algorithms, so I'm attempting a straight port. (So I may have gotten some of the types wrong at this point)
 
-I'm not really happy with it at this point, a ton of cleanup needed. There's currently no consistency (some stuff is done by mutating, and some stuff done immutable).
+I'm not really happy with this port at this point, a ton of cleanup needed. There's currently no consistency in the set-up leading up to the actual nesting (some stuff is done by mutating, and some stuff done immutable). 
 
 Thinking of using Worker Threads?
 
